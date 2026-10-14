@@ -1,0 +1,83 @@
+/* Chai-Yo Para design tokens.
+   Default theme follows the device; the Display menu can force light or dark. Components only use these variables, so
+   dark mode and high contrast change values, never components. */
+:root {
+  --bg: #F3F5FA; --surface: #FFFFFF; --surface-2: #EEF2F9;
+  --border: #D9DFEA; --border-strong: #7E899F;
+  --text: #0D1424; --text-2: #4B566B;
+  --primary: #1F5BFF; --primary-text: #1747D6; --primary-soft: #E6EDFF; --on-primary: #FFFFFF;
+  --accent: #FF7A1A; --on-accent: #1A0E00; --accent-text: #A84300; --accent-soft: #FFEBDC;
+  --ok: #0B6E44; --ok-soft: #DDF5E9; --warn: #7A5200; --warn-soft: #FFF1CC;
+  --danger: #B4232A; --danger-soft: #FDE4E4; --focus: #1F5BFF;
+  --hero: #0D1424; --hero-2: #1A2338; --hero-text: #C9D1E3;
+  --track: #1F5BFF; --field: #E8590C; --road: #0E9384;
+  --gold: #F2B90F; --silver: #C3CAD6; --bronze: #D08A4E; --on-medal: #1A0E00;
+  --shadow: 0 12px 32px rgba(13, 20, 36, 0.12);
+  --font-head: 'Archivo', 'Noto Sans Thai', system-ui, sans-serif;
+  --font-body: 'Figtree', 'Noto Sans Thai', system-ui, sans-serif;
+  --radius-s: 8px; --radius-m: 12px; --radius-l: 16px;
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  --bg: #0A0F1E; --surface: #131A2C; --surface-2: #1B2440;
+  --border: #29344F; --border-strong: #6B7896;
+  --text: #EEF2FB; --text-2: #A7B1C8;
+  --primary: #2F66FF; --primary-text: #8FB0FF; --primary-soft: #18264D;
+  --accent: #FF8A33; --accent-text: #FFA366; --accent-soft: #3A2110;
+  --ok: #5FD69B; --ok-soft: #0F3324; --warn: #F5C451; --warn-soft: #3A2C08;
+  --danger: #FF8B8B; --danger-soft: #401A1D; --focus: #9DB8FF;
+  --hero: #141D36; --hero-2: #222C4D;
+  --track: #5C8CFF; --field: #E8692A; --road: #1FA893;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+:root[data-contrast='high'] {
+  --bg: #FFFFFF; --surface: #FFFFFF; --surface-2: #E9EDF5;
+  --border: #4B566B; --border-strong: #0D1424;
+  --text: #000000; --text-2: #27303F;
+  --primary: #0A3FD9; --primary-text: #0A2FA8; --primary-soft: #DCE6FF;
+  --accent-text: #7A2E00; --accent-soft: #FFE3CF;
+  --ok: #07512F; --ok-soft: #CFF0DF; --warn: #573A00; --warn-soft: #FFE9A8;
+  --danger: #7A0D13; --danger-soft: #FBD5D5; --focus: #000000;
+  --hero: #000000; --hero-text: #FFFFFF;
+  --track: #0A3FD9; --field: #9A3412; --road: #0B5F56; --bronze: #DC9C63;
+}
+:root[data-theme='dark'][data-contrast='high'] {
+  --bg: #000000; --surface: #0A0F1E; --surface-2: #17203A;
+  --border: #A7B1C8; --border-strong: #FFFFFF;
+  --text: #FFFFFF; --text-2: #DDE3F0;
+  --primary: #1B4AD6; --primary-text: #B9CDFF; --primary-soft: #16255A;
+  --accent: #FF9A4D; --accent-text: #FFC299; --accent-soft: #4A2810;
+  --ok: #8AEBB9; --ok-soft: #0D3A27; --warn: #FFD877; --warn-soft: #453400;
+  --danger: #FFB0B0; --danger-soft: #4D1A1E; --focus: #FFFFFF;
+  --hero: #000000; --hero-2: #17203A;
+  --track: #8FB0FF; --field: #FF9A4D; --road: #4FD1BC;
+}
+
+/* Device in dark mode and no explicit choice: same values as above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  --bg: #0A0F1E; --surface: #131A2C; --surface-2: #1B2440;
+  --border: #29344F; --border-strong: #6B7896;
+  --text: #EEF2FB; --text-2: #A7B1C8;
+  --primary: #2F66FF; --primary-text: #8FB0FF; --primary-soft: #18264D;
+  --accent: #FF8A33; --accent-text: #FFA366; --accent-soft: #3A2110;
+  --ok: #5FD69B; --ok-soft: #0F3324; --warn: #F5C451; --warn-soft: #3A2C08;
+  --danger: #FF8B8B; --danger-soft: #401A1D; --focus: #9DB8FF;
+  --hero: #141D36; --hero-2: #222C4D;
+  --track: #5C8CFF; --field: #E8692A; --road: #1FA893;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+  }
+  :root:not([data-theme='light'])[data-contrast='high'] {
+  --bg: #000000; --surface: #0A0F1E; --surface-2: #17203A;
+  --border: #A7B1C8; --border-strong: #FFFFFF;
+  --text: #FFFFFF; --text-2: #DDE3F0;
+  --primary: #1B4AD6; --primary-text: #B9CDFF; --primary-soft: #16255A;
+  --accent: #FF9A4D; --accent-text: #FFC299; --accent-soft: #4A2810;
+  --ok: #8AEBB9; --ok-soft: #0D3A27; --warn: #FFD877; --warn-soft: #453400;
+  --danger: #FFB0B0; --danger-soft: #4D1A1E; --focus: #FFFFFF;
+  --hero: #000000; --hero-2: #17203A;
+  --track: #8FB0FF; --field: #FF9A4D; --road: #4FD1BC;
+  }
+}

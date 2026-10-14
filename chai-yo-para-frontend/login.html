@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in · Chai-Yo Para</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231F5BFF'/%3E%3Cpath d='M5 19a14 14 0 0 1 14-14M9 19a10 10 0 0 1 10-10M13 19a6 6 0 0 1 6-6' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+  <script src="js/display-init.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400..700&family=Noto+Sans+Thai:wght@400..800&display=swap">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <style>
+    .auth { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: stretch; margin: 32px auto 48px; max-width: 980px; }
+    .auth-side { position: relative; overflow: hidden; border-radius: 16px; min-height: 420px; padding: 32px; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; color: #fff; background: var(--hero) url('images/hero-stadium.webp') center / cover; }
+    .auth-side::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,20,36,.35), rgba(13,20,36,.92)); }
+    .auth-side > * { position: relative; }
+    .auth-side h1 { font-size: 2rem; line-height: 1.1; }
+    .auth-side p { color: #fff; opacity: .9; }
+    .auth-card { display: flex; flex-direction: column; gap: 20px; padding: 28px; }
+    .auth-field { display: flex; flex-direction: column; gap: 6px; }
+    .auth-form { display: flex; flex-direction: column; gap: 16px; }
+    .auth-error { margin: 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--danger); color: var(--danger); font-weight: 600; }
+    .auth-error:empty { display: none; }
+    .auth-form[hidden], .auth-demo[hidden] { display: none; }
+    .auth-demo { font-size: .875rem; }
+    @media (max-width: 860px) { .auth { grid-template-columns: 1fr; } .auth-side { min-height: 220px; } }
+  </style>
+</head>
+<body class="app">
+  <main id="main" tabindex="-1">
+    <div class="container page-enter">
+      <div class="auth">
+        <section class="auth-side" aria-label="About Chai-Yo Para">
+          <span class="eyebrow eyebrow-light">Para Athletics Open</span>
+          <h1>Staff sign in</h1>
+          <p>Admins set up events and athletes. Judges enter scores, ranks, points and medals. Visitors do not need an account: the medal table and results are public.</p>
+        </section>
+
+        <section class="card auth-card" aria-labelledby="auth-title">
+          <div class="stack" style="gap:4px">
+            <h2 id="auth-title">Sign in</h2>
+            <span class="small muted th" lang="th">เข้าสู่ระบบ</span>
+          </div>
+
+          <div class="seg" role="group" aria-label="Choose form" style="align-self:flex-start">
+            <button type="button" id="tab-in" aria-pressed="true">Sign in</button>
+            <button type="button" id="tab-up" aria-pressed="false">Register</button>
+          </div>
+
+          <p class="auth-error" id="err" role="alert"></p>
+
+          <form id="form-in" class="auth-form" novalidate>
+            <label class="auth-field"><span class="label">Username</span>
+              <input class="input" name="username" autocomplete="username" required></label>
+            <label class="auth-field"><span class="label">Password</span>
+              <input class="input" name="password" type="password" autocomplete="current-password" required></label>
+            <button type="submit" class="btn btn-primary" id="go-in">Sign in</button>
+            <p class="auth-demo muted" id="demo-hint" hidden>Demo accounts: admin1, judge1, sporter1. Password: test1234</p>
+          </form>
+
+          <form id="form-up" class="auth-form" novalidate hidden>
+            <label class="auth-field"><span class="label">Username</span>
+              <input class="input" name="username" autocomplete="username" required></label>
+            <label class="auth-field"><span class="label">Email <span class="muted" style="font-weight:400">(optional)</span></span>
+              <input class="input" name="email" type="email" autocomplete="email"></label>
+            <label class="auth-field"><span class="label">Role</span>
+              <select class="select input" name="role">
+                <option value="sporter">Sporter</option>
+                <option value="judge">Judge</option>
+              </select></label>
+            <label class="auth-field"><span class="label">Password</span>
+              <input class="input" name="password" type="password" autocomplete="new-password" required minlength="6"></label>
+            <label class="auth-field"><span class="label">Confirm password</span>
+              <input class="input" name="confirm" type="password" autocomplete="new-password" required></label>
+            <button type="submit" class="btn btn-primary" id="go-up">Create account</button>
+          </form>
+
+          <a href="index.html" class="small">← Back to the medal table</a>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { renderShell } from './js/ui.js'
+    import { homeFor, login, register, safeNext } from './js/auth.js'
+    import { isMock } from './js/api.js'
+
+    renderShell('login')
+
+    const $ = (id) => document.getElementById(id)
+    const err = $('err')
+    const params = new URLSearchParams(location.search)
+    const next = safeNext(params.get('next'))
+    if (isMock) $('demo-hint').hidden = false
+
+    function show(which) {
+      const up = which === 'up'
+      $('form-in').hidden = up; $('form-up').hidden = !up
+      $('tab-in').setAttribute('aria-pressed', String(!up)); $('tab-up').setAttribute('aria-pressed', String(up))
+      $('auth-title').textContent = up ? 'Create an account' : 'Sign in'
+      err.textContent = ''
+      ;(up ? $('form-up') : $('form-in')).querySelector('input').focus()
+    }
+    $('tab-in').addEventListener('click', () => show('in'))
+    $('tab-up').addEventListener('click', () => show('up'))
+    if (params.get('mode') === 'register') show('up')
+    if (params.get('reason') === 'staff') err.textContent = 'Please sign in with an admin or judge account to open the staff area.'
+
+    function busy(btn, on, label) { btn.disabled = on; btn.textContent = on ? 'Please wait…' : label }
+    function done(user) { location.replace(next || homeFor(String(user?.role || '').toLowerCase())) }
+
+    $('form-in').addEventListener('submit', async (e) => {
+      e.preventDefault(); err.textContent = ''
+      const f = new FormData(e.target), btn = $('go-in')
+      const username = String(f.get('username')).trim(), password = String(f.get('password'))
+      if (!username || !password) { err.textContent = 'Enter your username and password.'; return }
+      busy(btn, true, 'Sign in')
+      try { done(await login(username, password)) } catch (ex) { err.textContent = ex.message; busy(btn, false, 'Sign in') }
+    })
+
+    $('form-up').addEventListener('submit', async (e) => {
+      e.preventDefault(); err.textContent = ''
+      const f = Object.fromEntries(new FormData(e.target)), btn = $('go-up')
+      f.username = f.username.trim()
+      if (!f.username || !f.password) { err.textContent = 'Choose a username and a password.'; return }
+      if (f.password !== f.confirm) { err.textContent = 'The two passwords do not match.'; return }
+      const body = { username: f.username, password: f.password, role: f.role }
+      if (f.email.trim()) body.email = f.email.trim()
+      busy(btn, true, 'Create account')
+      try { done(await register(body)) } catch (ex) { err.textContent = ex.message; busy(btn, false, 'Create account') }
+    })
+  </script>
+</body>
+</html>

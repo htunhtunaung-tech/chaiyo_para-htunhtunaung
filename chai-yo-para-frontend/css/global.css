@@ -1,0 +1,129 @@
+@import './tokens.css';
+@import './animations.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 100%; }
+html[data-text='large'] { font-size: 112.5%; }
+html[data-text='largest'] { font-size: 125%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font-body); font-size: 1rem; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-family: var(--font-head); font-weight: 800; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem); line-height: 1.15; }
+h2 { font-size: 1.375rem; line-height: 1.3; }
+h3 { font-size: 1.0625rem; line-height: 1.4; }
+p { margin: 0; }
+a { color: var(--primary-text); }
+a:hover { color: var(--text); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+img, svg { display: block; }
+
+.skip-link { position: absolute; left: -9999px; top: 8px; z-index: 100; padding: 12px 16px; border-radius: 8px; background: var(--text); color: var(--surface); font-weight: 700; }
+.skip-link:focus { left: 8px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Layout */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+main { flex: 1; padding: 32px 0 64px; }
+.stack { display: flex; flex-direction: column; gap: 24px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.muted { color: var(--text-2); }
+.small { font-size: 0.875rem; line-height: 1.45; }
+.num { font-family: var(--font-head); font-stretch: 75%; font-weight: 800; font-variant-numeric: tabular-nums; }
+.th { font-family: 'Noto Sans Thai', var(--font-body); }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-l); overflow: clip; }
+.display-panel.card { overflow: visible; }
+.card-pad { padding: 24px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: var(--radius-s); border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 700; text-decoration: none; }
+.btn:hover { color: var(--text); background: var(--surface-2); }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.btn-primary:hover { background: var(--primary); color: var(--on-primary); filter: brightness(0.94); }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--primary-text); }
+.btn-icon { width: 44px; padding: 0; }
+
+/* Chips and badges */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font-weight: 600; }
+.chip[aria-pressed='true'] { background: var(--text); color: var(--surface); border-color: var(--text); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.badge { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.badge-ok { background: var(--ok-soft); color: var(--ok); }
+.badge-warn { background: var(--warn-soft); color: var(--warn); }
+.badge-info { background: var(--primary-soft); color: var(--primary-text); }
+.badge-neutral { background: var(--surface-2); color: var(--text-2); }
+.badge-live { background: var(--accent); color: var(--on-accent); }
+.country { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 26px; padding: 0 6px; border-radius: 6px; color: #FFFFFF; font-family: var(--font-head); font-weight: 800; font-size: 0.75rem; letter-spacing: 0.02em; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.28); flex: none; }
+.medal { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; color: var(--on-medal); font-family: var(--font-head); font-weight: 800; font-size: 0.8125rem; box-shadow: inset 0 0 0 1px rgba(26,14,0,0.35); flex: none; }
+.medal-gold { background: var(--gold); } .medal-silver { background: var(--silver); } .medal-bronze { background: var(--bronze); }
+.medal-none { background: var(--surface-2); color: var(--text); }
+
+/* Forms */
+.input { min-height: 48px; padding: 0 16px; border-radius: var(--radius-s); border: 1px solid var(--border-strong); background: var(--surface); width: 100%; }
+.select { min-height: 44px; padding: 0 12px; border-radius: var(--radius-s); border: 1px solid var(--border-strong); background: var(--surface); }
+.label { font-size: 0.875rem; font-weight: 700; }
+
+/* Tables built with CSS grid (no <table> so rows can animate freely) */
+.table-head { display: grid; gap: 12px; align-items: center; padding: 10px 24px; background: var(--surface-2); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+.table-row { display: grid; gap: 12px; align-items: center; min-height: 60px; padding: 8px 24px; border-top: 1px solid var(--border); background: var(--surface); position: relative; }
+
+@media (max-width: 640px) {
+  .container { padding: 0 16px; }
+  main { padding: 20px 0 96px; }
+  .card-pad { padding: 16px; }
+  .card-head, .table-head, .table-row { padding-left: 16px; padding-right: 16px; }
+}
+
+/* Country flags (SVGs in /flags, from the MIT-licensed flag-icons set) */
+.flag { display: inline-block; flex: none; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 1px var(--border-strong); background: var(--surface-2); }
+.flag-sm { width: 20px; height: 15px; } .flag-md { width: 26px; height: 20px; } .flag-lg { width: 48px; height: 36px; border-radius: 5px; }
+.chips-scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 6px; }
+.chips-scroll .chip { flex: none; }
+
+/* ---------- Pictures ---------- */
+/* Page background: a faint running track (light) or glowing lanes at night (dark).
+   High contrast mode drops every picture so text sits on a plain colour. */
+body { background-image: url('../images/bg-light.webp'); background-size: cover; background-position: center bottom; background-attachment: fixed; }
+:root[data-theme='dark'] body { background-image: url('../images/bg-dark.webp'); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) body { background-image: url('../images/bg-dark.webp'); } }
+:root[data-contrast='high'] body { background-image: none; }
+
+/* Photo banners: picture + dark overlay, white text on top. */
+.photo-banner { position: relative; isolation: isolate; overflow: hidden; min-height: 190px; padding: 32px 36px; border-radius: 22px; color: #FFFFFF; background: var(--hero); align-items: flex-end; box-shadow: var(--shadow); }
+.photo-banner .photo-layer { position: absolute; inset: 0; z-index: -1; background-size: cover; background-repeat: no-repeat; background-position: var(--pos, center); animation: ken-burns 26s ease-in-out infinite alternate; transform-origin: 70% 50%; }
+.photo-banner h1, .photo-banner h2 { color: #FFFFFF; }
+.photo-banner .muted, .photo-banner .th, .photo-banner .eyebrow { color: rgba(255,255,255,.88); }
+.photo-banner .eyebrow { letter-spacing: .08em; }
+
+.photo-banner .photo-layer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6,12,36,.9) 0%, rgba(6,12,36,.62) 38%, rgba(6,12,36,.08) 100%); }
+
+/* Home hero: athletes on the left, words on the calm night sky on the right. */
+.hero-photo { position: relative; isolation: isolate; min-height: 380px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); background: var(--hero); }
+.hero-photo .photo-layer { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(6,12,36,0) 0%, rgba(6,12,36,.25) 38%, rgba(6,12,36,.82) 62%, rgba(6,12,36,.9) 100%), url('../images/hero-stadium.webp') left center / cover no-repeat; animation: ken-burns 30s ease-in-out infinite alternate; transform-origin: 20% 70%; }
+.hero-photo .photo-layer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 30%, rgba(255,170,90,.18) 45%, transparent 60%); background-size: 250% 100%; animation: light-sweep 9s ease-in-out infinite; }
+.hero-photo .hero-copy { grid-column: 2; }
+@keyframes ken-burns { from { transform: scale(1); } to { transform: scale(1.08) translateX(-1%); } }
+@keyframes light-sweep { 0%, 20% { background-position: 120% 0; } 70%, 100% { background-position: -40% 0; } }
+
+/* High contrast: the pictures stay, but text sits on solid black (no see-through overlay). */
+:root[data-contrast='high'] .hero-photo .photo-layer { background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 40%, #000 52%, #000 100%), url('../images/hero-stadium.webp') left center / cover no-repeat; }
+:root[data-contrast='high'] .hero-photo .photo-layer::after { display: none; }
+:root[data-contrast='high'] .photo-banner .photo-layer::after { background: linear-gradient(90deg, #000 0%, #000 50%, rgba(0,0,0,.2) 75%, rgba(0,0,0,0) 100%); }
+:root[data-contrast='high'] .photo-banner > .row { background: #000; padding: 8px 12px; border-radius: 12px; }
+@media (max-width: 900px) {
+  .hero-photo { grid-template-columns: 1fr; }
+  .hero-photo .hero-copy { grid-column: 1; }
+  .hero-photo .photo-layer { background: linear-gradient(0deg, rgba(6,12,36,.92) 0%, rgba(6,12,36,.6) 60%, rgba(6,12,36,.3) 100%), url('../images/hero-stadium.webp') left center / cover no-repeat; }
+}
+.hero-photo .hero-stats > div { background: rgba(6,12,36,.55); backdrop-filter: blur(6px); }

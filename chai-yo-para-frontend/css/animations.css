@@ -1,0 +1,41 @@
+/* All motion lives here. Everything stops when the visitor turns on
+   "Reduce motion" or their device asks for reduced motion. */
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,122,26,0.6); } 70%, 100% { box-shadow: 0 0 0 10px rgba(255,122,26,0); } }
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+@keyframes flash { 0% { background: var(--accent-soft); } 100% { background: var(--surface); } }
+@keyframes bump { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes lap { to { offset-distance: 100%; } }
+@keyframes burst { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.6); } }
+@keyframes flip-in { from { transform: rotateY(90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ring { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
+@keyframes slide-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+.anim-rise { animation: rise 0.6s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.anim-fade { animation: fade 0.4s ease both; }
+.page-enter { animation: rise 0.45s cubic-bezier(.2,.7,.2,1) both; }
+.pulse { animation: pulse 1.6s ease-out infinite; }
+.bar-grow { transform-origin: left; animation: grow-x 0.9s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms + 0.15s); }
+.col-grow { transform-origin: bottom; animation: grow-y 0.8s cubic-bezier(.2,.7,.2,1) both; }
+.row-flash { animation: flash 2.2s ease-out; }
+.num-bump { display: inline-block; animation: bump 0.6s ease; color: var(--accent-text); }
+.draw { stroke-dasharray: 1; animation: draw 1.6s ease-out both; }
+.lift { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.lift:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--border-strong); }
+.btn, .chip { transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease, filter 0.15s ease; }
+.btn:active, .chip:active { transform: scale(0.97); }
+.skeleton { border-radius: 6px; background: linear-gradient(90deg, var(--surface-2) 0, var(--border) 50%, var(--surface-2) 100%); background-size: 800px 100%; animation: shimmer 1.4s linear infinite; }
+
+html[data-motion='reduce'] *, html[data-motion='reduce'] *::before, html[data-motion='reduce'] *::after {
+  animation: none !important; transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) *, html:not([data-motion='full']) *::before, html:not([data-motion='full']) *::after {
+    animation: none !important; transition: none !important;
+  }
+}
