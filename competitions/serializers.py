@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
+from .countries import official_country
 from .models import Sport, Athlete, Event, CompetesIn
 
 
@@ -20,6 +21,13 @@ class AthleteSerializer(serializers.ModelSerializer):
 
     def get_full_name(self, obj) -> str:
         return f"{obj.first_name} {obj.last_name}"
+
+    def validate_country(self, value):
+        # Only real Paralympic delegations; "THA" or "thailand" is saved as "Thailand".
+        name = official_country(value)
+        if not name:
+            raise serializers.ValidationError('Use a country that takes part in the Paralympic Games, e.g. Thailand or THA.')
+        return name
 
 
 class EventSerializer(serializers.ModelSerializer):
