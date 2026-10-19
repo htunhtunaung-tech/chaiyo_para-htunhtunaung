@@ -74,6 +74,27 @@ const fmt = (sport, v) => {
 }
 const POINTS = [8, 7, 6, 5, 4, 3, 2, 1]
 
+// Same a, b, c coefficients as the Django PointsTable (World Athletics combined-events tables),
+// so the demo shows the real points formula: track a·(b − T)^c, field a·(D − b)^c.
+const COEFF = {
+  '100 m': { M: [25.4347, 18, 1.81, 's'], F: [17.857, 21, 1.81, 's'] },
+  '400 m': { M: [1.53775, 82, 1.81, 's'], F: [1.34285, 91.7, 1.81, 's'] },
+  '1500 m': { M: [0.03768, 480, 1.85, 's'], F: [0.02883, 535, 1.88, 's'] },
+  'Long Jump': { M: [0.14354, 220, 1.4, 'cm'], F: [0.188807, 210, 1.41, 'cm'] },
+  'Shot Put': { M: [51.39, 1.5, 1.05, 'm'], F: [56.0211, 1.5, 1.05, 'm'] },
+  'Javelin': { M: [10.14, 7, 1.08, 'm'], F: [15.9803, 3.8, 1.04, 'm'] },
+}
+const coeffOf = (ev) => COEFF[ev._sport.name]?.[ev.gender] || null
+const parseMark = (v) => { const p = String(v).trim().split(':').map(Number); return p.some(Number.isNaN) ? null : p.reduce((t, x) => t * 60 + x, 0) }
+function pointsFor(ev, mark) {
+  const k = coeffOf(ev)
+  if (!k || mark == null) return null
+  const [a, b, c, unit] = k
+  const v = unit === 'cm' ? mark * 100 : mark
+  const gap = unit === 's' ? b - v : v - b
+  return gap > 0 ? Math.floor(a * gap ** c) : 0
+}
+
 function buildEvents() {
   seed = 7
   let rid = 1
@@ -127,7 +148,7 @@ function resultsOf(ev) {
     const final = ev.status === 'result'
     const auto = {
       score: shown ? fmt(ev._sport, en.mark) : '',
-      point: final && rank && rank <= 8 ? POINTS[rank - 1] : null,
+      point: coeffOf(ev) ? (shown ? pointsFor(ev, en.mark) : null) : final && rank && rank <= 8 ? POINTS[rank - 1] : null,
       rank,
       medal: final && rank === 1 ? 'gold' : final && rank === 2 ? 'silver' : final && rank === 3 ? 'bronze' : null,
     }
@@ -138,7 +159,7 @@ function resultsOf(ev) {
 
 const publicEvent = (ev) => {
   const { _sport, _entries, _shown, ...rest } = ev
-  return { ...rest, participants: _entries.map((en) => ({ id: en.id, athlete: { id: en.athlete.id, name: en.athlete.name, country: en.athlete.country }, lane: en.lane })) }
+  return { ...rest, points_auto: Boolean(coeffOf(ev)), participants: _entries.map((en) => ({ id: en.id, athlete: { id: en.athlete.id, name: en.athlete.name, country: en.athlete.country }, lane: en.lane })) }
 }
 
 function medals() {
@@ -190,13 +211,24 @@ export async function mockSend(method, path, body = {}) {
     if (body.status === 'live') ev._shown = 0
     return publicEvent(ev)
   }
+  if ((m = path.match(/^\/api\/events\/(\d+)\/rank\/$/))) {
+    // Points from the formula, then ranks by points (highest first). Ties share a rank.
+    const ev = findEvent(m[1]); stopSimulation(ev)
+    const rows = resultsOf(ev).filter((r) => r.score !== '' && r.score != null)
+    for (const r of rows) r.point = coeffOf(ev) ? pointsFor(ev, parseMark(r.score)) : r.point
+    const better = (x, y) => (coeffOf(ev) ? y.point - x.point : (ev._sport.better === 'low' ? parseMark(x.score) - parseMark(y.score) : parseMark(y.score) - parseMark(x.score)))
+    rows.sort(better)
+    rows.forEach((r, i) => { r.rank = i > 0 && better(rows[i - 1], r) === 0 ? rows[i - 1].rank : i + 1 })
+    for (const r of rows) { const en = ev._entries.find((x) => x.id === r.id); en.manual = { ...(en.manual || {}), score: r.score, rank: r.rank, point: r.point } }
+    return resultsOf(ev)
+  }
   if ((m = path.match(/^\/api\/events\/(\d+)\/auto-medals\/$/))) {
     const ev = findEvent(m[1]); stopSimulation(ev)
     const rows = resultsOf(ev)
     for (const en of ev._entries) {
       const r = rows.find((x) => x.id === en.id)
       const medal = r.rank === 1 ? 'gold' : r.rank === 2 ? 'silver' : r.rank === 3 ? 'bronze' : null
-      en.manual = { ...(en.manual || {}), medal, point: r.rank && r.rank <= 8 ? POINTS[r.rank - 1] : null }
+      en.manual = { ...(en.manual || {}), medal, point: coeffOf(ev) ? r.point : r.rank && r.rank <= 8 ? POINTS[r.rank - 1] : null }
     }
     return resultsOf(ev)
   }
@@ -208,6 +240,7 @@ export async function mockSend(method, path, body = {}) {
       // Freeze the simulated values first so later status changes don't override what was typed.
       const now = resultsOf(ev).find((x) => x.id === en.id)
       en.manual = { score: now.score, rank: now.rank, point: now.point, medal: now.medal, ...(en.manual || {}), ...body }
+      if (coeffOf(ev) && 'score' in body) en.manual.point = body.score === '' || body.score == null ? null : pointsFor(ev, parseMark(body.score))
       return resultsOf(ev).find((x) => x.id === en.id)
     }
     throw new ApiError('Not found.', 404)

@@ -57,13 +57,13 @@ Use **Live Server** in VS Code: right-click `index.html` and choose **Open with 
 Double-clicking the file does not work, because the JavaScript files are modules
 (`<script type="module">`) and browsers only load modules from a server.
 
-The pages start with **demo data** (`USE_MOCK = true` in `js/config.js`), so they work
-before the backend is ready. In the demo, live events finish while you watch, so the
-medal table moves.
+The pages talk to Django by default. **Demo data** (no backend needed) switches on by itself on
+`*.vercel.app`, `*.github.io` and `*.netlify.app` addresses, or locally with `?demo=1` in the address
+(`?demo=0` switches it off). In the demo, live events finish while you watch, so the medal table moves.
 
 ## Connecting to Django
 
-1. In `js/config.js` set `USE_MOCK = false` and check `API_URL` (default `http://127.0.0.1:8000`).
+1. Check `API_URL` in `js/config.js` (pages served by Django on port 8000 use the same address automatically).
 2. Live Server runs on port 5500 and Django on 8000, so Django must allow the page.
    Member 1 or 2 adds this to the backend:
    ```
@@ -112,8 +112,7 @@ medal table moves.
 - Backend words are converted in two places only: `js/api.js` (what we send: Men/Women/Mixed, `start_list`,
   `date_time`) and `js/normalize.js` (what we read). Pages keep using M / F / X and `start-list`.
 - An old token (for example after the database was reset) is dropped automatically so public pages keep working.
-- `USE_MOCK = false` by default now. For the offline demo set it to `true`; sign in with
-  `admin1`, `judge1` or `sporter1` (password `test1234`).
+- Demo mode (see above) signs in with `admin1`, `judge1` or `sporter1` (password `test1234`).
 - Django must allow Live Server: `CORS_ALLOWED_ORIGINS = ['http://127.0.0.1:5500', 'http://localhost:5500']`.
 
 ## Countries and flags

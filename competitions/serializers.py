@@ -5,7 +5,9 @@ from rest_framework.exceptions import PermissionDenied
 
 from django.contrib.auth import get_user_model
 
-from .models import Sport, Athlete, Event, CompetesIn
+from .models import Sport, Athlete, Event, CompetesIn, PointsTable
+from .points import has_points_table
+from .countries import official_country
 
 User = get_user_model()
 
@@ -94,6 +96,12 @@ class AthleteSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj) -> str:
         return f"{obj.first_name} {obj.last_name}"
 
+    def validate_country(self, value):
+        country = official_country(value)
+        if not country:
+            raise serializers.ValidationError('Choose a country from the list of Paralympic delegations.')
+        return country
+
 
 class EventSerializer(serializers.ModelSerializer):
     sport_name = serializers.CharField(source='sport.name', read_only=True)
@@ -101,13 +109,18 @@ class EventSerializer(serializers.ModelSerializer):
     sport_type = serializers.SerializerMethodField()
     rank_order = serializers.CharField(source='sport.rank_order', read_only=True)
     judge_name = serializers.CharField(source='judge.username', read_only=True, default='')
+    points_auto = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         fields = ['id', 'name', 'date_time', 'gender', 'status', 'venue', 'classification',
                   'sport', 'sport_name', 'sport_sub_type', 'sport_type', 'rank_order',
-                  'judge', 'judge_name', 'auto_status']
+                  'judge', 'judge_name', 'auto_status', 'points_auto']
         read_only_fields = ['status']     # changes only through PATCH /events/<id>/status/
+
+    def get_points_auto(self, obj) -> bool:
+        """True when points for this event are calculated from a PointsTable formula."""
+        return has_points_table(obj)
 
     def get_sport_type(self, obj) -> str:
         return (obj.sport.name or '').lower()
@@ -203,3 +216,9 @@ class StatusInputSerializer(serializers.Serializer):
         if isinstance(data.get('status'), str):
             data['status'] = data['status'].replace('-', '_')      # the website says start-list
         return super().to_internal_value(data)
+
+
+class PointsTableSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PointsTable
+        fields = ['id', 'event', 'gender', 'classification', 'measure', 'a', 'b', 'c']

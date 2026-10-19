@@ -9,6 +9,7 @@ import csv
 
 from django.core.management.base import BaseCommand, CommandError
 
+from competitions.countries import official_country
 from competitions.models import Athlete
 
 NEEDED = ['first_name', 'last_name', 'country', 'gender', 'classification']
@@ -35,10 +36,12 @@ class Command(BaseCommand):
             for n, row in enumerate(reader, start=2):
                 row = {k: (v or '').strip() for k, v in row.items()}
                 gender = GENDERS.get(row['gender'].lower())
-                if not (row['first_name'] and row['last_name'] and row['country'] and gender and row['classification']):
-                    self.stderr.write(f'Line {n}: skipped (empty field or gender not Men/Women)')
+                country = official_country(row['country'])
+                if not (row['first_name'] and row['last_name'] and country and gender and row['classification']):
+                    self.stderr.write(f'Line {n}: skipped (empty field, unknown country or gender not Men/Women)')
                     skipped += 1
                     continue
+                row['country'] = country
                 _, created = Athlete.objects.get_or_create(
                     first_name=row['first_name'], last_name=row['last_name'], country=row['country'],
                     defaults={'gender': gender, 'classification': row['classification']})

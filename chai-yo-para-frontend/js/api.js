@@ -107,6 +107,7 @@ export const addParticipant = (eventId, athleteId) => send('POST', `/api/events/
 export const removeParticipant = (eventId, athleteId) => send('DELETE', `/api/events/${eventId}/participants/${athleteId}/`)
 export const setEventStatus = (id, status) => send('PATCH', `/api/events/${id}/status/`, { status })
 export const autoMedals = (id) => send('POST', `/api/events/${id}/auto-medals/`)
+export const rankEvent = (id) => send('POST', `/api/events/${id}/rank/`)       // points + ranks, no medals
 export const updateResult = (id, data) => send('PATCH', `/api/results/${id}/`, data)
 
 // Website accounts: the same users as Django /admin/ (admin only).

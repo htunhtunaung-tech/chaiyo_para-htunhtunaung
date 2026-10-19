@@ -73,7 +73,9 @@
             <div id="athlete-fields" class="auth-form" style="gap:12px">
               <label class="auth-field"><span class="label">First name</span><input class="input" name="first_name" autocomplete="given-name"></label>
               <label class="auth-field"><span class="label">Last name</span><input class="input" name="last_name" autocomplete="family-name"></label>
-              <label class="auth-field"><span class="label">Nationality</span><input class="input" name="nationality" autocomplete="country-name" placeholder="e.g. Thailand"></label>
+              <label class="auth-field"><span class="label">Country (Paralympic delegation)</span>
+                <span class="row" style="gap:10px;flex-wrap:nowrap"><img id="nat-flag" class="flag" src="flags/neutral.svg" alt="" width="36" height="27" style="width:36px;height:27px;flex:none">
+                <select class="select input" name="nationality" id="nationality" autocomplete="country-name" style="flex:1;min-width:0"><option value="">Choose your country</option></select></span></label>
               <label class="auth-field"><span class="label">Gender <span class="muted" style="font-weight:400">(optional)</span></span>
                 <select class="select input" name="gender"><option value="">Select gender</option><option value="Men">Men</option><option value="Women">Women</option></select></label>
               <label class="auth-field"><span class="label">Classification <span class="muted" style="font-weight:400">(optional)</span></span><input class="input" name="classification" placeholder="e.g. T54, F46"></label>
@@ -95,6 +97,7 @@
     import { renderShell } from './js/ui.js'
     import { homeFor, login, register, safeNext } from './js/auth.js'
     import { isMock } from './js/api.js'
+    import { ALL_COUNTRIES, NPC, countryFlag } from './js/countries.js'
 
     renderShell('login')
 
@@ -103,6 +106,11 @@
     const params = new URLSearchParams(location.search)
     const next = safeNext(params.get('next'))
     if (isMock) $('demo-hint').hidden = false
+
+    // Country list: every Paris 2024 Paralympic delegation, so a typo can never create a fake country.
+    const natSelect = $('nationality'), natFlag = $('nat-flag')
+    natSelect.insertAdjacentHTML('beforeend', ALL_COUNTRIES.map((c) => `<option value="${NPC[c][0]}">${NPC[c][0]} · ${NPC[c][1]}</option>`).join(''))
+    natSelect.addEventListener('change', () => { natFlag.src = countryFlag(natSelect.value) })
 
     function show(which) {
       const up = which === 'up'

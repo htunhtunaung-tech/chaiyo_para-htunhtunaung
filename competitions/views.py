@@ -10,11 +10,13 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Sport, Athlete, Event, CompetesIn
+from .models import Sport, Athlete, Event, CompetesIn, PointsTable
+from .points import calculate_points, update_points
 from .schedule import sync_event_statuses
 from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrJudge
 from .serializers import (SportSerializer, AthleteSerializer, AthleteDetailSerializer, EventSerializer,
-                          ResultSerializer, ParticipantInputSerializer, StatusInputSerializer)
+                          ResultSerializer, ParticipantInputSerializer, StatusInputSerializer,
+                          PointsTableSerializer)
 
 STATUS_FLOW = ['start_list', 'live', 'result']
 ALLOWED_BACK_STEPS = {('result', 'live')}          # admin may reopen a published event
@@ -62,6 +64,14 @@ class SportViewSet(ProtectedDeleteMixin, viewsets.ModelViewSet):
     queryset = Sport.objects.all().order_by('id')
     serializer_class = SportSerializer
     permission_classes = [IsAdminOrReadOnly]
+
+
+class PointsTableViewSet(viewsets.ModelViewSet):
+    """/api/points-tables/ - the a, b, c coefficients. Everyone can read; only admins can change them."""
+    queryset = PointsTable.objects.all()
+    serializer_class = PointsTableSerializer
+    permission_classes = [IsAdminOrReadOnly]
+    pagination_class = None
 
 
 class AthleteViewSet(ProtectedDeleteMixin, viewsets.ModelViewSet):
@@ -161,9 +171,23 @@ class EventViewSet(viewsets.ModelViewSet):
         return Response(EventSerializer(event).data)
 
     @extend_schema(request=None, responses=ResultSerializer(many=True))
+    @action(detail=True, methods=['post'], url_path='rank', permission_classes=[IsAdminOrJudge])
+    def rank(self, request, pk=None):
+        """POST /api/events/<id>/rank/ - recalculate points and ranks (no medals).
+        Admin any time after the start; a judge only for their own live event."""
+        event = self.get_object()
+        if event.status == 'start_list':
+            return Response({'detail': 'Start the event before ranking it.'}, status=status.HTTP_409_CONFLICT)
+        if request.user.role == 'judge' and (event.judge_id != request.user.id or event.status != 'live'):
+            raise PermissionDenied('Judges can only rank their own event while it is live.')
+        run_auto_medals(event, set_medals=False)
+        qs = event.competesin_set.select_related('athlete', 'event__sport').order_by(*RESULT_ORDER)
+        return Response(ResultSerializer(qs, many=True, context={'request': request}).data)
+
+    @extend_schema(request=None, responses=ResultSerializer(many=True))
     @action(detail=True, methods=['post'], url_path='auto-medals', permission_classes=[IsAdmin])
     def auto_medals(self, request, pk=None):
-        """POST /api/events/<id>/auto-medals/ - rank by score and give medals 1/2/3."""
+        """POST /api/events/<id>/auto-medals/ - rank by points (or score) and give medals 1/2/3."""
         event = self.get_object()
         if event.status == 'start_list':
             return Response({'detail': 'Start the event before ranking it.'}, status=status.HTTP_409_CONFLICT)
@@ -173,19 +197,30 @@ class EventViewSet(viewsets.ModelViewSet):
 
 
 @transaction.atomic
-def run_auto_medals(event):
-    """Rank by score using the sport's rank_order (asc = lowest wins, desc = highest wins).
+def run_auto_medals(event, set_medals=True):
+    """Recalculate points, then rank. When every result has points the ranking uses points (highest wins),
+    as the TOR asks; otherwise it uses the score with the sport's rank_order (asc = lowest wins).
     Ties share a rank (1,1,3). Entries with no score (DNS/DNF) get no rank and no medal."""
-    entries = list(event.competesin_set.select_for_update().exclude(score__isnull=True))
-    entries.sort(key=lambda r: r.score, reverse=(event.sport.rank_order == 'desc'))
-    prev_score, prev_rank = None, 0
+    entries = list(event.competesin_set.select_for_update().select_related('athlete', 'event__sport')
+                   .exclude(score__isnull=True))
+    by_points = bool(entries) and update_points(entries)
+    if by_points:
+        key, reverse = (lambda r: r.point), True
+    else:
+        key, reverse = (lambda r: r.score), (event.sport.rank_order == 'desc')
+    entries.sort(key=key, reverse=reverse)
+    prev, prev_rank = None, 0
     for i, r in enumerate(entries, start=1):
-        rank = prev_rank if r.score == prev_score else i
-        prev_score, prev_rank = r.score, rank
+        rank = prev_rank if key(r) == prev else i
+        prev, prev_rank = key(r), rank
         r.rank = rank
-        r.medal = {1: 'gold', 2: 'silver', 3: 'bronze'}.get(rank)
-        r.save(update_fields=['rank', 'medal'])
-    event.competesin_set.filter(score__isnull=True).update(rank=None, medal=None)
+        fields = ['rank']
+        if set_medals:
+            r.medal = {1: 'gold', 2: 'silver', 3: 'bronze'}.get(rank)
+            fields.append('medal')
+        r.save(update_fields=fields)
+    blanks = event.competesin_set.filter(score__isnull=True)
+    blanks.update(rank=None, point=None, **({'medal': None} if set_medals else {}))
 
 
 # ---------------- Admin or judge ----------------
@@ -208,4 +243,10 @@ class ResultUpdateView(UpdateAPIView):
                 raise PermissionDenied('You are not the judge of this event.')
             if event.status != 'live':
                 raise PermissionDenied('Judges can only enter results while the event is live.')
-        serializer.save()
+        entry = serializer.save()
+        # Points come from the formula whenever the event has a points table (typed points are kept otherwise).
+        pts = calculate_points(entry)
+        if pts is not None and pts != entry.point:
+            entry.point = pts
+            entry.save(update_fields=['point'])
+

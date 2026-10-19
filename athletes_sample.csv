@@ -1,5 +1,5 @@
 first_name,last_name,country,gender,classification
-Anan,Otieno,USA,Men,T11
+Anan,Otieno,United States,Men,T11
 Hiro,Park,Kenya,Men,T11
 Marcus,Mori,Japan,Men,T11
 Rafael,Lopez,Canada,Men,T12
@@ -19,7 +19,7 @@ Takumi,Mori,France,Men,T54
 Ethan,Cooper,Germany,Men,T54
 Diego,Mori,Brazil,Men,T54
 Chai,Mori,Canada,Men,T54
-Nok,Gray,USA,Women,T11
+Nok,Gray,United States,Women,T11
 Sakura,Dubois,Germany,Women,T11
 Grace,Chen,Canada,Women,T11
 Ana,Costa,France,Women,T12
@@ -34,7 +34,7 @@ Anouk,Bennett,France,Women,T47
 Ola,Mori,France,Women,T54
 Naomi,Fischer,Australia,Women,T54
 Amani,Kim,Canada,Women,T54
-Claire,Visser,Korea,Women,T54
+Claire,Visser,Republic of Korea,Women,T54
 Aiko,Otieno,Australia,Women,T54
 Mia,Cooper,Poland,Women,T54
 Sofia,Nowak,Great Britain,Women,T54

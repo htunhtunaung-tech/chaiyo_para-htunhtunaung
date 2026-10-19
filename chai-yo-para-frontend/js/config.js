@@ -2,11 +2,24 @@
 
 // true  = use the built-in demo data (works with no backend, good for practice and demos)
 // false = call the Django API at API_URL
-export const USE_MOCK = false
+// Demo data switches on by itself when the site is hosted without Django (the live portfolio demo on
+// Vercel or GitHub Pages). Locally you can try it with ?demo=1 and switch back with ?demo=0.
+const DEMO_HOSTS = ['.vercel.app', '.github.io', '.netlify.app']
+function demoMode() {
+  try {
+    const flag = new URLSearchParams(location.search).get('demo')
+    if (flag === '1') sessionStorage.setItem('chaiyo-demo', '1')
+    if (flag === '0') sessionStorage.removeItem('chaiyo-demo')
+    if (sessionStorage.getItem('chaiyo-demo') === '1') return true
+  } catch { /* storage blocked: fall through */ }
+  return DEMO_HOSTS.some((h) => location.hostname.endsWith(h))
+}
+export const USE_MOCK = demoMode()
 
 // Where Django runs. With Live Server the page is on port 5500 and Django on 8000,
 // so Django must allow this origin (django-cors-headers, see README).
-export const API_URL = 'http://127.0.0.1:8000'
+// When Django serves the pages itself (python manage.py runserver) the API is on the same address.
+export const API_URL = location.port === '8000' ? location.origin : 'http://127.0.0.1:8000'
 
 // How often the medal table and live results refresh, in milliseconds.
 export const POLL_MS = 5000

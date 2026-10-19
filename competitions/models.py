@@ -88,3 +88,34 @@ class CompetesIn(models.Model):
 
     def __str__(self):
         return f"{self.athlete} in {self.event}"
+
+
+class PointsTable(models.Model):
+    """Coefficients that turn a result into points (TOR: TRACKPOINT / FIELDPOINT).
+    Track (time):      points = a * (b - T) ** c      (T in seconds, faster = more points)
+    Field (distance):  points = a * (D - b) ** c      (D in metres or centimetres)
+    'event' is matched against the event name ("Men's 100m T54" uses the "100m" row).
+    A blank classification means the row is used for every class."""
+    MEASURES = (('s', 'Time in seconds'), ('m', 'Distance in metres'), ('cm', 'Height or distance in centimetres'))
+    GENDER_CHOICES = Athlete.GENDER_CHOICES
+
+    event = models.CharField(max_length=40, help_text='e.g. 100m, Long jump, Discus throw')
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    classification = models.CharField(max_length=20, blank=True, help_text='e.g. T54. Leave blank for all classes.')
+    measure = models.CharField(max_length=2, choices=MEASURES)
+    a = models.FloatField()
+    b = models.FloatField()
+    c = models.FloatField()
+
+    class Meta:
+        ordering = ['gender', 'event', 'classification']
+        constraints = [models.UniqueConstraint(fields=['event', 'gender', 'classification'], name='one_points_row_per_event_gender_class')]
+
+    def __str__(self):
+        return f"{self.gender} {self.event} {self.classification or '(all classes)'}"
+
+    def points_for(self, score):
+        """Whole points for one result (scores are stored in seconds or metres)."""
+        value = float(score) * (100 if self.measure == 'cm' else 1)
+        gap = (self.b - value) if self.measure == 's' else (value - self.b)
+        return int(self.a * gap ** self.c) if gap > 0 else 0

@@ -35,7 +35,8 @@ export function flagImg(code, size = 'md') {
 }
 export function countryChip(code, withName = false) {
   const c = countryCode(code)
-  return `<span class="row" style="gap:8px;min-width:0">${flagImg(c)}<span class="country" style="background:${countryColor(c)}" title="${esc(countryName(c))}">${esc(c)}</span>${withName ? `<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(countryName(c))}</span>` : ''}</span>`
+  // Without the name the chip must never shrink, or the code badge slides under the athlete's name.
+  return `<span class="row" style="gap:8px;min-width:0${withName ? '' : ';flex:none'}">${flagImg(c)}<span class="country" style="flex:none;background:${countryColor(c)}" title="${esc(countryName(c))}">${esc(c)}</span>${withName ? `<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(countryName(c))}</span>` : ''}</span>`
 }
 
 const MEDAL = { gold: 'Gold', silver: 'Silver', bronze: 'Bronze' }

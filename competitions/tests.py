@@ -7,7 +7,7 @@ from django.db import IntegrityError, transaction
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from .models import Sport, Athlete, Event, CompetesIn
+from .models import Sport, Athlete, Event, CompetesIn, PointsTable
 
 User = get_user_model()
 WHEN = datetime(2036, 10, 11, 9, 0, tzinfo=timezone.utc)
@@ -149,6 +149,9 @@ class PermissionTests(Base):
         r = self.client.post('/api/athletes/', {'first_name': 'N', 'last_name': 'M', 'country': 'Laos',
                                                 'gender': 'Men', 'classification': 'T11'})
         self.assertEqual(r.status_code, 201)
+        bad = self.client.post('/api/athletes/', {'first_name': 'N', 'last_name': 'X', 'country': 'Atlantis',
+                                                  'gender': 'Men', 'classification': 'T11'})
+        self.assertEqual(bad.status_code, 400)          # only real Paralympic delegations
 
     def test_judge_must_have_judge_role(self):
         self.as_user(self.admin)
@@ -504,3 +507,79 @@ class ClockStatusTests(Base):
     def test_medal_table_counts_clock_finished_events(self):
         self.make('d', self.now - self.td(hours=5))
         self.assertEqual(self.client.get('/api/medals/').data[0]['gold'], 1)
+
+
+class PointsTests(Base):
+    """Automatic points: score -> points with a * (b - T) ** c (track) or a * (D - b) ** c (field)."""
+
+    def live(self, event):
+        event.status = 'live'
+        event.save(update_fields=['status'])
+
+    def test_default_coefficients_match_world_athletics_reference_values(self):
+        men_100 = PointsTable.objects.get(event='100m', gender='Men', classification='')
+        self.assertEqual(men_100.points_for(Decimal('10.395')), 1000)
+        long_jump = PointsTable.objects.get(event='Long jump', gender='Men', classification='')
+        self.assertEqual(long_jump.points_for(Decimal('7.76')), 1000)        # metres, table in centimetres
+        self.assertEqual(men_100.points_for(Decimal('19.00')), 0)            # slower than b: no points
+
+    def test_judge_saving_a_score_fills_in_points(self):
+        r1, = self.enter(self.event, [self.a1])
+        self.live(self.event)
+        self.as_user(self.judge)
+        r = self.client.patch(f'/api/results/{r1.id}/', {'score': '14.20'}, format='json')
+        self.assertEqual(r.status_code, 200)
+        r1.refresh_from_db()
+        self.assertEqual(r1.point, Decimal('284'))
+        self.assertTrue(self.client.get(f'/api/events/{self.event.id}/').data['points_auto'])
+
+    def test_ranking_uses_points_so_classes_can_compete_together(self):
+        # A T53 athlete gets a class-specific table, so the slower time can still score more points.
+        PointsTable.objects.create(event='100m', gender='Men', classification='T53', measure='s', a=25.4347, b=22.0, c=1.81)
+        self.a2.classification = 'T53'
+        self.a2.save()
+        fast, slow = self.enter(self.event, [self.a1, self.a2], ['14.20', '15.00'])
+        self.live(self.event)
+        self.as_user(self.admin)
+        r = self.client.post(f'/api/events/{self.event.id}/rank/')
+        self.assertEqual(r.status_code, 200)
+        fast.refresh_from_db(); slow.refresh_from_db()
+        self.assertGreater(slow.point, fast.point)
+        self.assertEqual((slow.rank, fast.rank), (1, 2))
+        self.assertIsNone(slow.medal)                                       # ranking alone gives no medal
+
+    def test_auto_medals_rank_by_points(self):
+        rows = self.enter(self.event, [self.a1, self.a2, self.a3], ['14.20', '14.35', '14.90'])
+        self.live(self.event)
+        self.as_user(self.admin)
+        self.client.post(f'/api/events/{self.event.id}/auto-medals/')
+        for r in rows: r.refresh_from_db()
+        self.assertEqual([(r.rank, r.medal) for r in rows], [(1, 'gold'), (2, 'silver'), (3, 'bronze')])
+        self.assertTrue(all(r.point and r.point > 0 for r in rows))
+
+    def test_event_without_a_table_keeps_typed_points(self):
+        marathon = Event.objects.create(name="Men's Marathon", date_time=WHEN, gender='Men', sport=self.track, judge=self.judge)
+        r1, = self.enter(marathon, [self.a1])
+        self.live(marathon)
+        self.as_user(self.judge)
+        self.client.patch(f'/api/results/{r1.id}/', {'score': '5400', 'point': 7}, format='json')
+        r1.refresh_from_db()
+        self.assertEqual(r1.point, Decimal('7'))
+        self.assertFalse(self.client.get(f'/api/events/{marathon.id}/').data['points_auto'])
+
+    def test_judge_can_only_rank_own_live_event(self):
+        self.enter(self.event, [self.a1], ['14.20'])
+        self.live(self.event)
+        self.as_user(self.judge2)
+        self.assertEqual(self.client.post(f'/api/events/{self.event.id}/rank/').status_code, 403)
+        self.as_user(self.judge)
+        self.assertEqual(self.client.post(f'/api/events/{self.event.id}/rank/').status_code, 200)
+
+    def test_only_admin_can_change_coefficients(self):
+        row = PointsTable.objects.first()
+        self.as_user(self.judge)
+        self.assertEqual(self.client.patch(f'/api/points-tables/{row.id}/', {'a': 1}, format='json').status_code, 403)
+        self.as_user(None)
+        self.assertEqual(self.client.get('/api/points-tables/').status_code, 200)
+        self.as_user(self.admin)
+        self.assertEqual(self.client.patch(f'/api/points-tables/{row.id}/', {'a': 1}, format='json').status_code, 200)

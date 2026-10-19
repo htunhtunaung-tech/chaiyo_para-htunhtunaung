@@ -57,6 +57,7 @@ export function normalizeEvent(e) {
     judgeId: typeof e.judge === 'number' ? e.judge : e.judge?.id ?? null,
     judge: typeof e.judge === 'object' ? pick(e.judge, 'username', 'name') : pick(e, 'judge_name', 'judge') || '',
     participants: e.participants ? asList(e.participants).map(normalizeResult) : [],
+    pointsAuto: Boolean(e.points_auto),          // points come from the a·b·c formula on the server
   }
 }
 export const normalizeEvents = (data) => asList(data).map(normalizeEvent)
@@ -72,7 +73,7 @@ export function normalizeResult(r) {
     country: countryCode(pick(a, 'country', 'country_code', 'nationality') || pick(r, 'country', 'country_code')),
     // score_display is the backend's ready-to-show text (3:58.10, 14.20 ...)
     score: pick(r, 'score_display', 'score', 'result', 'mark', 'time') ?? '',
-    points: pick(r, 'point', 'points') ?? '',
+    points: (() => { const v = pick(r, 'point', 'points'); return v === null || v === undefined || v === '' ? '' : Number(v) })(),   // "916.00" -> 916
     rank: rank === undefined || rank === '' ? null : Number(rank),
     medal: ['gold', 'silver', 'bronze'].includes(medal) ? medal : medal === '1' ? 'gold' : medal === '2' ? 'silver' : medal === '3' ? 'bronze' : '',
     lane: pick(r, 'lane', 'order', 'bib') ?? '',

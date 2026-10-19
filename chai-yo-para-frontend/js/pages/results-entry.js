@@ -1,6 +1,6 @@
 // Results entry for judges and admins: type scores, ranks, points and medals.
 // Each row saves with PATCH /api/results/<id>/.
-import { autoMedals, getEvent, getEventResults, getEvents, setEventStatus, updateResult } from '../api.js'
+import { autoMedals, getEvent, getEventResults, getEvents, rankEvent, setEventStatus, updateResult } from '../api.js'
 import { formatDate, genderLabel } from '../format.js'
 import { renderAppShell, toast } from '../manage-ui.js'
 import { countryChip, esc, flip, icon, medalChip, skeletonRows, stateMessage, statusBadge, TYPE_COLOR, typeDot } from '../ui.js'
@@ -38,11 +38,12 @@ function draw(animate = true) {
         <span class="small muted">${event.status === 'start-list' ? 'Results open when the event starts (automatically at its start time, or when an admin starts it).' : event.status === 'live' ? 'Results show on the public site as soon as you save them.' : 'Results are published. Set the medals when the ranks are final.'}</span>
         <div class="row" style="flex-wrap:wrap">
           <button type="button" class="btn" id="sort">${icon('swap', 18)}Sort by rank</button>
-          <button type="button" class="btn" id="rank">${icon('flag', 18)}Rank from results</button>
+          <button type="button" class="btn" id="rank">${icon('flag', 18)}${event.pointsAuto ? 'Rank by points' : 'Rank from results'}</button>
           ${event.status === 'start-list' ? `<button type="button" class="btn btn-primary" data-status="live">${icon('timer', 18)}Start the event</button>` : ''}
           ${event.status === 'live' ? `<button type="button" class="btn btn-primary" data-status="result">${icon('check', 18)}Finish and publish</button>` : ''}
           ${event.status === 'result' ? `<button type="button" class="btn btn-primary" id="auto">${icon('medal', 18)}Set medals from ranks</button>` : ''}
         </div></div>
+      ${event.pointsAuto ? `<div class="row small" style="padding:12px 24px;border-top:1px solid var(--border);gap:10px">${icon('flag', 18)}<span><strong>Points are calculated automatically</strong> from each result with the World Athletics formula (track: a·(b − time)<sup>c</sup>, field: a·(distance − b)<sup>c</sup>). Ranks and medals follow the points.</span></div>` : ''}
     </section>
     <section class="card" aria-labelledby="sheet-h">
       <div class="card-head"><h2 id="sheet-h">Result sheet</h2><button type="button" class="btn btn-primary" id="save-all">${icon('save', 18)}Save all changes</button></div>
@@ -56,7 +57,7 @@ function draw(animate = true) {
             <span class="center muted">${esc(r.lane || '–')}</span>
             <label><span class="visually-hidden">Result for ${esc(r.name)}</span><input class="input-sm num" name="score" value="${esc(r.score)}" placeholder="${event.type === 'field' ? 'm' : 'time'}" inputmode="decimal" style="font-size:1.125rem" ${event.status === 'start-list' ? 'disabled' : ''}></label>
             <label><span class="visually-hidden">Rank for ${esc(r.name)}</span><input class="input-sm" name="rank" type="number" min="1" value="${r.rank ?? ''}" ${event.status === 'start-list' ? 'disabled' : ''}></label>
-            <label><span class="visually-hidden">Points for ${esc(r.name)}</span><input class="input-sm" name="point" type="number" min="0" value="${r.points ?? ''}" ${event.status === 'start-list' ? 'disabled' : ''}></label>
+            <label><span class="visually-hidden">Points for ${esc(r.name)}</span><input class="input-sm" name="point" type="number" min="0" value="${r.points ?? ''}" ${event.status === 'start-list' ? 'disabled' : ''}${event.pointsAuto ? ' readonly title="Calculated automatically when you save the result" placeholder="auto"' : ''}></label>
             <label><span class="visually-hidden">Medal for ${esc(r.name)}</span><select class="input-sm" name="medal" ${event.status === 'start-list' ? 'disabled' : ''}>${[['', 'None'], ['gold', 'Gold'], ['silver', 'Silver'], ['bronze', 'Bronze']].map(([v, l]) => `<option value="${v}"${(r.medal || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
             <button type="submit" class="btn" data-save disabled>${icon('save', 16)}Save</button>
           </form>`).join('')}</div></div></div>`}
@@ -76,9 +77,12 @@ async function saveRow(form) {
   const id = form.dataset.key
   const data = Object.fromEntries(new FormData(form))
   const body = { score: data.score, rank: data.rank === '' ? null : Number(data.rank), point: data.point === '' ? null : Number(data.point), medal: data.medal || null }
+  if (event.pointsAuto) delete body.point                     // the server calculates the points
   const updated = await updateResult(id, body)
   const r = rows.find((x) => String(x.id) === String(id))
-  Object.assign(r, { score: body.score, rank: body.rank, points: body.point, medal: body.medal || '' }, updated && updated.id ? {} : {})
+  const serverPoints = updated && updated.point !== undefined ? (updated.point === null ? null : Number(updated.point)) : body.point
+  Object.assign(r, { score: body.score, rank: body.rank, points: serverPoints, medal: body.medal || '' })
+  if (form.elements.point) form.elements.point.value = serverPoints ?? ''
   form.classList.remove('is-dirty'); form.querySelector('[data-save]').setAttribute('disabled', '')
   form.classList.remove('saved-flash'); void form.offsetWidth; form.classList.add('saved-flash')
   form.querySelector('.medal').outerHTML = medalChip(r.medal, r.rank)
@@ -102,6 +106,14 @@ sheet.addEventListener('click', async (e) => {
   if (st) { try { await setEventStatus(selected, st.dataset.status); toast(st.dataset.status === 'live' ? 'The event is live.' : 'Results are published.'); await refreshEvents(); load(false) } catch (err) { toast(err.message, 'error') } }
   if (e.target.closest('#auto')) { try { await autoMedals(selected); toast('Medals set from the ranks.'); load(false) } catch (err) { toast(err.message, 'error') } }
   if (e.target.closest('#sort')) { rows.sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)); draw(false) }
+  if (e.target.closest('#rank') && event.pointsAuto) {
+    // Save what is typed, then let the server work out points and ranks with the formula.
+    try {
+      for (const f of document.querySelectorAll('form.result-row.is-dirty')) await saveRow(f)
+      await rankEvent(selected); toast('Points calculated and ranked by points.'); load(false)
+    } catch (err) { toast(err.message, 'error') }
+    return
+  }
   if (e.target.closest('#rank')) {
     // Works out ranks from the typed results: lowest time wins on track and road, longest mark wins in the field.
     const val = (s) => { const p = String(s).split(':').map(Number); return p.reduce((t, x) => t * 60 + x, 0) }

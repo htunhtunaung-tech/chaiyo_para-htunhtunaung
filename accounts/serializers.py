@@ -2,6 +2,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from django.db import transaction
+from competitions.countries import official_country
 from competitions.models import Athlete
 
 from .models import User
@@ -32,15 +33,17 @@ class RegisterSerializer(serializers.ModelSerializer):
                   'nationality', 'gender', 'classification']
 
     def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # One validate() only: a second definition would silently replace this password check.
         candidate = User(username=attrs.get('username', ''), email=attrs.get('email', ''))
         validate_password(attrs['password'], user=candidate)
-        return attrs
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
         if attrs.get('role', 'athlete') == 'athlete':
             if not attrs.get('nationality', '').strip():
-                raise serializers.ValidationError({'nationality': 'Enter your nationality.'})
+                raise serializers.ValidationError({'nationality': 'Choose your country.'})
+            country = official_country(attrs['nationality'])
+            if not country:
+                raise serializers.ValidationError({'nationality': 'Choose a country from the list of Paralympic delegations.'})
+            attrs['nationality'] = country          # always store the official name, e.g. "THA" -> "Thailand"
             if not attrs.get('first_name', '').strip() or not attrs.get('last_name', '').strip():
                 raise serializers.ValidationError({'first_name': 'Enter your first and last name to create your athlete profile.'})
         return attrs

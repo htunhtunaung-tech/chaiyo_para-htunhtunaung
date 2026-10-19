@@ -26,7 +26,7 @@ ATHLETES = [
     ('Somchai', 'Rattana', 'Thailand', 'Men', 'T54'),
     ('Arun', 'Wongsa', 'Thailand', 'Men', 'T54'),
     ('Kenji', 'Aoki', 'Japan', 'Men', 'T54'),
-    ('Daniel', 'Brooks', 'USA', 'Men', 'T54'),
+    ('Daniel', 'Brooks', 'United States', 'Men', 'T54'),
     ('Lucas', 'Ferreira', 'Brazil', 'Men', 'T11'),
     ('Mali', 'Suksan', 'Thailand', 'Women', 'T54'),
     ('Yuki', 'Tanaka', 'Japan', 'Women', 'T54'),

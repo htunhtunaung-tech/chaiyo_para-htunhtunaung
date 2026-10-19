@@ -193,6 +193,27 @@ class AthleteRegistrationTests(APITestCase):
         r = self.client.post('/api/auth/register/', {'username': 'fan1', 'password': GOOD, 'role': 'visitor'}, format='json')
         self.assertEqual(r.status_code, 201)
 
+    def athlete(self, username, nationality, password=GOOD):
+        return self.client.post('/api/auth/register/', {'username': username, 'password': password, 'role': 'athlete',
+                                'first_name': 'A', 'last_name': username, 'nationality': nationality}, format='json')
+
+    def test_unknown_country_is_rejected(self):
+        r = self.athlete('runner3', 'Thiland')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('nationality', r.data)
+        self.assertFalse(User.objects.filter(username='runner3').exists())
+
+    def test_country_code_is_stored_as_official_name(self):
+        from competitions.models import Athlete
+        self.assertEqual(self.athlete('runner4', 'tha').status_code, 201)
+        self.assertEqual(Athlete.objects.get(user__username='runner4').country, 'Thailand')
+
+    def test_weak_password_is_rejected_even_with_valid_athlete_details(self):
+        r = self.athlete('runner5', 'Thailand', password='12345678')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('password', str(r.data).lower())
+        self.assertFalse(User.objects.filter(username='runner5').exists())
+
 
 class LockedLoginTests(APITestCase):
     def setUp(self):
