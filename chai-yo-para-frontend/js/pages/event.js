@@ -13,17 +13,24 @@ let first = true, lastKey = ''
 app.innerHTML = `<div class="card">${skeletonRows(8)}</div>`
 
 function podium(results) {
-  const pick = (m, r) => results.find((x) => x.medal === m) || results.find((x) => x.rank === r)
-  const spots = [['silver', 2, 120, 0.15], ['gold', 1, 160, 0], ['bronze', 3, 92, 0.3]].map(([medal, place, h, delay]) => ({ medal, place, h, delay, who: pick(medal, place) })).filter((s) => s.who && s.who.rank)
-  if (!spots.length) return ''
-  return `<section aria-label="Podium" class="podium">${spots.map((s) => `
+  // Athletes who tie share a step: two golds stand together on step 1 (and then there is no silver).
+  const hasMedals = results.some((x) => x.medal)
+  const pick = (m, r) => results.filter((x) => (hasMedals ? x.medal === m : x.rank === r) && x.rank)
+  const spots = [['silver', 2, 120, 0.15], ['gold', 1, 160, 0], ['bronze', 3, 92, 0.3]].map(([medal, place, h, delay]) => ({ medal, place, h, delay, who: pick(medal, place) }))
+  if (!spots.some((s) => s.who.length)) return ''
+  const person = (w) => `<div class="podium-person">
+        ${w.athleteId ? `<a href="athlete.html?id=${encodeURIComponent(w.athleteId)}" class="podium-name">${esc(w.name)}</a>` : `<span class="podium-name">${esc(w.name)}</span>`}
+        ${countryChip(w.country)}<span class="num podium-score">${esc(w.score)}</span>
+      </div>`
+  // An empty step (e.g. no silver after a tie for gold) keeps its place, so gold stays in the middle.
+  return `<section aria-label="Podium" class="podium">${spots.map((s) => !s.who.length ? '<div class="podium-spot" aria-hidden="true"></div>' : `
     <div class="podium-spot">
       <div class="podium-who anim-rise" style="animation-delay:${0.5 + s.delay}s">
-        ${medalChip(s.who.medal || s.medal, s.place, 'podium-medal')}
-        ${s.who.athleteId ? `<a href="athlete.html?id=${encodeURIComponent(s.who.athleteId)}" class="podium-name">${esc(s.who.name)}</a>` : `<span class="podium-name">${esc(s.who.name)}</span>`}
-        ${countryChip(s.who.country)}<span class="num podium-score">${esc(s.who.score)}</span>
+        ${medalChip(s.who[0].medal || s.medal, s.who[0].rank || s.place, 'podium-medal')}
+        ${s.who.length > 1 ? `<span class="badge">Tied · ${s.who.length} athletes</span>` : ''}
+        <div class="podium-people">${s.who.map(person).join('')}</div>
       </div>
-      <div class="podium-block col-grow podium-${s.medal}" style="height:${s.h}px;animation-delay:${s.delay}s"><span class="num">${s.place}</span></div>
+      <div class="podium-block col-grow podium-${s.medal}" style="height:${s.h}px;animation-delay:${s.delay}s"><span class="num">${s.who[0].rank || s.place}</span></div>
     </div>`).join('')}</section>`
 }
 
