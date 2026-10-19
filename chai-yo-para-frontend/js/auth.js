@@ -69,9 +69,11 @@ export async function login(username, password) {
 export async function register(fields) {
   if (USE_MOCK) throw new ApiError('Register is not available in demo mode. Use admin1, judge1 or sporter1 (password test1234).', 400)
   const data = await post('/api/auth/register/', fields)
+  // A judge request is not signed in: it waits for an admin ({ pending: true, message }).
+  if (data?.pending) return { pending: true, message: data.message, user: data.user }
   if (!data?.token) throw new ApiError('The server did not return a token.', 500)
   saveSession({ token: data.token, user: data.user || { username: fields.username } })
-  return data.user
+  return { pending: false, user: data.user }
 }
 
 export async function signOut() {

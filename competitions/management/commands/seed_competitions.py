@@ -1,5 +1,4 @@
-import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -23,78 +22,53 @@ SPORTS = [
 ]
 
 # first, last, country, gender, classification   (fictional names)
-# 30 real Paralympic delegations, one man and one woman each. Country names match
-# competitions/countries.py, so the website shows the right flag.
 ATHLETES = [
-    ('Somchai', 'Rattana', 'Thailand', 'Men', 'T54'), ('Mali', 'Suksan', 'Thailand', 'Women', 'T54'),
-    ('Haoran', 'Li', 'China', 'Men', 'T11'), ('Mei', 'Zhang', 'China', 'Women', 'F46'),
-    ('Lucas', 'Ferreira', 'Brazil', 'Men', 'T11'), ('Camila', 'Souza', 'Brazil', 'Women', 'T47'),
-    ('Daniel', 'Brooks', 'United States', 'Men', 'T54'), ('Ashley', 'Carter', 'United States', 'Women', 'T54'),
-    ('Tom', 'Hughes', 'Great Britain', 'Men', 'F46'), ('Emma', 'Clarke', 'Great Britain', 'Women', 'T54'),
-    ('Daan', 'de Vries', 'Netherlands', 'Men', 'T64'), ('Fleur', 'Visser', 'Netherlands', 'Women', 'T64'),
-    ('Luca', 'Bianchi', 'Italy', 'Men', 'T64'), ('Giulia', 'Romano', 'Italy', 'Women', 'T47'),
-    ('Andriy', 'Kovalenko', 'Ukraine', 'Men', 'T11'), ('Olena', 'Shevchuk', 'Ukraine', 'Women', 'T11'),
-    ('Jack', 'Thornton', 'Australia', 'Men', 'T54'), ('Sarah', 'Nguyen', 'Australia', 'Women', 'F46'),
-    ('Kenji', 'Aoki', 'Japan', 'Men', 'T54'), ('Yuki', 'Tanaka', 'Japan', 'Women', 'T54'),
-    ('Arjun', 'Sharma', 'India', 'Men', 'F46'), ('Priya', 'Nair', 'India', 'Women', 'F46'),
-    ('Yacine', 'Benali', 'Algeria', 'Men', 'T11'), ('Amina', 'Haddad', 'Algeria', 'Women', 'T11'),
-    ('Brian', 'Otieno', 'Kenya', 'Men', 'T11'), ('Faith', 'Wanjiru', 'Kenya', 'Women', 'T11'),
-    ('Jonas', 'Keller', 'Germany', 'Men', 'F46'), ('Lena', 'Fischer', 'Germany', 'Women', 'T64'),
-    ('Hugo', 'Moreau', 'France', 'Men', 'T64'), ('Chloe', 'Dubois', 'France', 'Women', 'T47'),
-    ('Piotr', 'Nowak', 'Poland', 'Men', 'F46'), ('Anna', 'Kowalska', 'Poland', 'Women', 'F46'),
-    ('Walid', 'Trabelsi', 'Tunisia', 'Men', 'T11'), ('Rania', 'Gharbi', 'Tunisia', 'Women', 'T47'),
-    ('Youssef', 'Alaoui', 'Morocco', 'Men', 'T11'), ('Salma', 'Bennani', 'Morocco', 'Women', 'T11'),
-    ('Diego', 'Hernandez', 'Mexico', 'Men', 'T54'), ('Valeria', 'Lopez', 'Mexico', 'Women', 'F46'),
-    ('Liam', 'Tremblay', 'Canada', 'Men', 'T54'), ('Olivia', 'Gagnon', 'Canada', 'Women', 'T54'),
-    ('Minjun', 'Kim', 'Republic of Korea', 'Men', 'T54'), ('Seoyeon', 'Park', 'Republic of Korea', 'Women', 'T54'),
-    ('Mateo', 'Gomez', 'Colombia', 'Men', 'T47'), ('Isabella', 'Rojas', 'Colombia', 'Women', 'T47'),
-    ('Pablo', 'Martin', 'Spain', 'Men', 'T64'), ('Lucia', 'Garcia', 'Spain', 'Women', 'T64'),
-    ('Emeka', 'Okafor', 'Nigeria', 'Men', 'F46'), ('Ngozi', 'Adeyemi', 'Nigeria', 'Women', 'F46'),
-    ('Hafiz', 'Rahim', 'Malaysia', 'Men', 'T54'), ('Siti', 'Zainal', 'Malaysia', 'Women', 'T54'),
-    ('Dimas', 'Pratama', 'Indonesia', 'Men', 'T47'), ('Putri', 'Lestari', 'Indonesia', 'Women', 'T47'),
-    ('Zaw', 'Min Htet', 'Myanmar', 'Men', 'T54'), ('Thandar', 'Aye', 'Myanmar', 'Women', 'T11'),
-    ('Minh', 'Tran', 'Vietnam', 'Men', 'F46'), ('Thu', 'Pham', 'Vietnam', 'Women', 'F46'),
-    ('Jerome', 'Dela Cruz', 'Philippines', 'Men', 'T47'), ('Angelica', 'Reyes', 'Philippines', 'Women', 'T64'),
-    ('Reza', 'Ahmadi', 'Iran', 'Men', 'F46'), ('Zahra', 'Karimi', 'Iran', 'Women', 'F46'),
+    ('Somchai', 'Rattana', 'Thailand', 'Men', 'T54'),
+    ('Arun', 'Wongsa', 'Thailand', 'Men', 'T54'),
+    ('Kenji', 'Aoki', 'Japan', 'Men', 'T54'),
+    ('Daniel', 'Brooks', 'USA', 'Men', 'T54'),
+    ('Lucas', 'Ferreira', 'Brazil', 'Men', 'T11'),
+    ('Mali', 'Suksan', 'Thailand', 'Women', 'T54'),
+    ('Yuki', 'Tanaka', 'Japan', 'Women', 'T54'),
+    ('Emma', 'Clarke', 'Great Britain', 'Women', 'T54'),
+    ('Li', 'Wei', 'China', 'Women', 'F46'),
+    ('Mei', 'Zhang', 'China', 'Women', 'F46'),
+    ('Sarah', 'Nguyen', 'Australia', 'Women', 'F46'),
+    ('Jonas', 'Keller', 'Germany', 'Men', 'F46'),
+    ('Pedro', 'Alves', 'Brazil', 'Men', 'F46'),
+    ('Tom', 'Hughes', 'Great Britain', 'Men', 'F46'),
 ]
 
-D = lambda d, h: datetime(2026, 10, d, h, 0, tzinfo=timezone.utc)
+# Dates are relative to the day you run the seed, so the demo always has finished, live and upcoming events:
+# "day 13" = today, 11/12 = earlier, 14 = tomorrow. Status then follows the real clock (see schedule.py).
+_TODAY = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+D = lambda d, h: _TODAY + timedelta(days=d - 13, hours=h)
 
-# name, date, gender, discipline keyword, status, (lowest score, highest score)
-# Eight athletes of the right gender are picked for each event; finished events get scores.
-EVENT_PLAN = [
-    ("Men's 100m T54", D(11, 9), 'Men', 'Sprinting', 'result', (13.9, 15.2)),
-    ("Women's 100m T54", D(11, 10), 'Women', 'Sprinting', 'result', (15.6, 17.4)),
-    ("Men's Long Jump T64", D(11, 15), 'Men', 'Long jump', 'result', (6.4, 7.9)),
-    ("Women's High Jump T47", D(12, 9), 'Women', 'High jump', 'result', (1.42, 1.66)),
-    ("Men's 1500m T11", D(12, 10), 'Men', 'Long-distance', 'result', (238.0, 262.0)),
-    ("Women's Discus Throw F46", D(12, 15), 'Women', 'Discus', 'result', (28.0, 41.0)),
-    ("Men's 400m Hurdles T47", D(13, 9), 'Men', 'Hurdling', 'result', (50.2, 56.9)),
-    ("Women's Long Jump T64", D(13, 10), 'Women', 'Long jump', 'result', (4.9, 6.1)),
-    ("Men's Discus Throw F46", D(13, 15), 'Men', 'Discus', 'result', (40.0, 52.0)),
-    ("Women's 1500m T11", D(14, 9), 'Women', 'Long-distance', 'result', (268.0, 300.0)),
-    ("Men's Marathon T54", D(14, 6), 'Men', 'Marathon', 'result', (5100.0, 5600.0)),
-    ("Women's 400m T54", D(15, 9), 'Women', 'Sprinting', 'live', None),
-    ("Men's High Jump T64", D(15, 14), 'Men', 'High jump', 'live', None),
-    ("Women's Marathon T54", D(16, 6), 'Women', 'Marathon', 'start_list', None),
-    ("Men's 5000m T11", D(16, 9), 'Men', 'Long-distance', 'start_list', None),
-    ("Women's Road Race T54", D(16, 10), 'Women', 'Road race', 'start_list', None),
+# name, date, gender, discipline keyword, class, venue, status, [(athlete last name, score)]
+# score: seconds for Track/Road, metres for Field, total points for Combined
+EVENTS = [
+    ("Men's 100m T54", D(11, 9), 'Men', 'Sprinting', 'T54', 'Main Stadium', 'result',
+     [('Rattana', '14.20'), ('Aoki', '14.35'), ('Brooks', '14.35'), ('Wongsa', '14.90')]),
+    ("Women's 400m T54", D(11, 11), 'Women', 'Sprinting', 'T54', 'Main Stadium', 'result',
+     [('Suksan', '55.10'), ('Tanaka', '56.40'), ('Clarke', '57.00')]),
+    ("Men's 1500m T54", datetime.now(timezone.utc) - timedelta(minutes=30),   # always live when you seed (demo for judges)
+     'Men', 'Long-distance', 'T54', 'Main Stadium', 'live',
+     [('Rattana', None), ('Aoki', None), ('Brooks', None)]),
+    ("Women's High Jump F46", D(12, 14), 'Women', 'High jump', 'F46', 'Field Arena', 'result',
+     [('Wei', '1.62'), ('Zhang', '1.58'), ('Nguyen', '1.55')]),
+    ("Men's Long Jump F46", D(13, 10), 'Men', 'Long jump', 'F46', 'Field Arena', 'start_list',
+     [('Keller', None), ('Alves', None), ('Hughes', None)]),
+    ("Men's Discus Throw F46", D(13, 15), 'Men', 'Discus', 'F46', 'Field Arena', 'start_list',
+     [('Keller', None), ('Alves', None), ('Hughes', None)]),
+    ("Men's Marathon T54", D(14, 6), 'Men', 'Marathon', 'T54', 'City Road Course', 'start_list',
+     [('Rattana', None), ('Wongsa', None), ('Aoki', None), ('Brooks', None)]),
+    ("Men's Road Race T54", D(14, 8), 'Men', 'Road race', 'T54', 'City Road Course', 'start_list',
+     [('Rattana', None), ('Aoki', None), ('Brooks', None)]),
+    ("Men's Decathlon F46", D(13, 8), 'Men', 'Decathlon', 'F46', 'Main Stadium', 'result',
+     [('Keller', '7421'), ('Alves', '7110'), ('Hughes', '6980')]),
+    ("Women's Heptathlon F46", D(14, 9), 'Women', 'Heptathlon', 'F46', 'Main Stadium', 'start_list',
+     [('Wei', None), ('Zhang', None), ('Nguyen', None)]),
 ]
-
-
-def build_events():
-    """Turn EVENT_PLAN into (name, date, gender, keyword, status, [(last name, score)])."""
-    rng = random.Random(2026)            # same demo data every time
-    events = []
-    for name, when, gender, key, status, span in EVENT_PLAN:
-        pool = [a[1] for a in ATHLETES if a[3] == gender]
-        picked = rng.sample(pool, 8)
-        entries = [(last, f'{rng.uniform(*span):.2f}' if span else None) for last in picked]
-        events.append((name, when, gender, key, status, entries))
-    return events
-
-
-EVENTS = build_events()
 
 
 class Command(BaseCommand):
@@ -107,7 +81,7 @@ class Command(BaseCommand):
         if not settings.DEBUG and not options['force']:
             raise CommandError('Demo data is for development only (these users have a known password). Use --force to override.')
         User = get_user_model()
-        for username, role in [('admin1', 'admin'), ('judge1', 'judge'), ('sporter1', 'sporter')]:
+        for username, role in [('admin1', 'admin'), ('judge1', 'judge'), ('sporter1', 'athlete')]:
             if not User.objects.filter(username=username).exists():
                 User.objects.create_user(username=username, password='test1234', role=role,
                                          is_staff=(role == 'admin'),
@@ -125,19 +99,24 @@ class Command(BaseCommand):
             athletes[l] = a
 
         judge = User.objects.get(username='judge1')
-        for name, when, gender, key, status, entries in EVENTS:
+        for name, when, gender, key, cls, venue, status, entries in EVENTS:
             sport = next(s for sub, s in sports.items() if key in sub)
             ev, created = Event.objects.get_or_create(
-                name=name, defaults={'date_time': when, 'gender': gender, 'status': status,
-                                     'sport': sport, 'judge': judge})
+                name=name, defaults={'date_time': when, 'gender': gender, 'status': 'start_list', 'sport': sport,
+                                     'judge': judge, 'venue': venue, 'classification': cls})
             if not created:
+                if not ev.venue:                       # events seeded before venues existed
+                    ev.venue, ev.classification = venue, cls
+                    ev.save(update_fields=['venue', 'classification'])
                 continue
             for last, score in entries:
                 CompetesIn.objects.create(event=ev, athlete=athletes[last],
                                           score=Decimal(score) if score else None)
-            if status == 'result':   # give finished events ranks + medals
-                from competitions.views import run_auto_medals
-                run_auto_medals(ev)
+
+        # The status listed above is only a hint: the real clock decides (finished / live / upcoming),
+        # and finished events get their ranks and medals from the scores.
+        from competitions.schedule import sync_event_statuses
+        sync_event_statuses()
 
         self.stdout.write(self.style.SUCCESS(
             'Seed done. Logins: admin1 / judge1 / sporter1  (password: test1234)'))

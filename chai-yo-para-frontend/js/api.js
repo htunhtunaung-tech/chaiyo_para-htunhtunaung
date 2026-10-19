@@ -50,24 +50,10 @@ function outgoing(method, path, body) {
     if (out.date && out.start_time) out.date_time = `${out.date}T${out.start_time}:00`
     if (out.venue !== undefined) out.location = out.venue
     // judge is a user id on the backend; the form has a free-text box, so only send a number.
-    if (out.judge === '' || out.judge === undefined || Number.isNaN(Number(out.judge))) delete out.judge
+    if (out.judge === '') out.judge = null                       // "No judge" in the dropdown
+    else if (out.judge === undefined || Number.isNaN(Number(out.judge))) delete out.judge
     return out
   }
-  // Results: empty boxes are sent as null, a time typed as m:ss.xx is sent in seconds (the score
-  // column is a number), and only an admin sends the medal (the backend refuses it from a judge).
-  if (/^\/api\/results\/\d+\/$/.test(path)) {
-    const out = { ...body }
-    for (const k of ['score', 'point', 'rank']) if (out[k] === '' || out[k] === undefined) out[k] = null
-    if (typeof out.score === 'string' && out.score.includes(':')) {
-      const secs = out.score.split(':').map(Number).reduce((t, x) => t * 60 + x, 0)
-      if (!Number.isNaN(secs)) out.score = secs.toFixed(2)
-    }
-    if (getUser()?.role !== 'admin') delete out.medal
-    else if (out.medal === '') out.medal = null
-    return out
-  }
-  // Add athlete: the backend reads "athlete"; keep "athlete_id" too for other versions.
-  if (/\/participants\/$/.test(path) && body.athlete_id !== undefined) return { athlete: Number(body.athlete_id), ...body }
   // Status values on the backend use an underscore: start_list, live, result.
   if (/\/status\/$/.test(path) && body.status) return { ...body, status: String(body.status).replace(/-/g, '_') }
   return body
@@ -87,7 +73,7 @@ async function apiSend(method, path, body) {
   if (!res.ok) {
     let detail = ''
     try { const j = await res.json(); detail = j.detail || Object.values(j).flat().join(' ') } catch { /* no JSON body */ }
-    const msg = res.status === 401 ? 'Please sign in again.' : res.status === 403 ? detail || 'Your account is not allowed to do this.' : detail || `Server error (${res.status}).`
+    const msg = res.status === 401 ? 'You need to sign in as an admin or judge to do this.' : detail || (res.status === 403 ? 'You are not allowed to do this.' : `Server error (${res.status}).`)
     throw new ApiError(msg, res.status)
   }
   return res.status === 204 ? {} : res.json().catch(() => ({}))
@@ -103,21 +89,17 @@ export const getEvent = async (id) => normalizeEvent(await get(`/api/events/${id
 export const getEventResults = async (id) => normalizeResults(await get(`/api/events/${id}/results/`))
 export const getAthletes = async (search = '') => normalizeAthletes(await get('/api/athletes/', { search }))
 export const getAthlete = async (id) => normalizeAthlete(await get(`/api/athletes/${id}/`))
+export const updateAthlete = (id, data) => send('PATCH', `/api/athletes/${id}/`, data)
 // The backend has no /api/auth/me/, so "who am I" is the user saved at login (see auth.js).
 export const getMe = async () => { const u = getUser(); if (!u) throw new ApiError('Please sign in.', 401); return u }
-// The backend only moves an event forward (start list -> live -> result); the demo data can also go back.
-export const canReopen = USE_MOCK
 export const hasToken = () => Boolean(token())
 export const isMock = USE_MOCK
 
 // ----- Admin and judge actions (agreed API list) -----
-// Sports: the backend sends { name: 'Track', sub_type: 'Sprinting (วิ่งระยะสั้น)' }; the form wants a name and a group.
-export const getSports = async () => {
-  const d = await get('/api/sports/')
-  return (Array.isArray(d) ? d : d.results || []).map((s) => s.sub_type
-    ? { ...s, name: String(s.sub_type).replace(/\s*\(.*\)\s*$/, ''), sport_type: String(s.name).toLowerCase() }
-    : s)
-}
+// Judges: the approved list (for the event form) and the requests waiting for an admin (admin only).
+export const getJudges = async (status = 'approved') => { const d = await get('/api/auth/judges/', { status }); return Array.isArray(d) ? d : d.results || [] }
+export const decideJudge = (id, decision) => send('POST', `/api/auth/judges/${id}/${decision}/`, {})
+export const getSports = async () => { const d = await get('/api/sports/'); return Array.isArray(d) ? d : d.results || [] }
 export const createEvent = (data) => send('POST', '/api/events/', data)
 export const updateEvent = (id, data) => send('PUT', `/api/events/${id}/`, data)
 export const deleteEvent = (id) => send('DELETE', `/api/events/${id}/`)
@@ -126,3 +108,9 @@ export const removeParticipant = (eventId, athleteId) => send('DELETE', `/api/ev
 export const setEventStatus = (id, status) => send('PATCH', `/api/events/${id}/status/`, { status })
 export const autoMedals = (id) => send('POST', `/api/events/${id}/auto-medals/`)
 export const updateResult = (id, data) => send('PATCH', `/api/results/${id}/`, data)
+
+// Website accounts: the same users as Django /admin/ (admin only).
+export const getUsers = async (params = {}) => { const d = await get('/api/auth/users/', params); return Array.isArray(d) ? d : d.results || [] }
+export const createUser = (data) => send('POST', '/api/auth/users/', data)
+export const updateUser = (id, data) => send('PATCH', `/api/auth/users/${id}/`, data)
+export const deleteUser = (id) => send('DELETE', `/api/auth/users/${id}/`)

@@ -1,16 +1,15 @@
 // Event setup: create, edit and delete events, manage who competes, and move
 // an event through start list → live → results → medals.
-import { countryName } from '../countries.js'
-import { addParticipant, autoMedals, createEvent, deleteEvent, getAthletes, getEvent, getEventResults, getEvents, getSports, removeParticipant, setEventStatus, updateEvent, canReopen } from '../api.js'
+import { addParticipant, autoMedals, createEvent, deleteEvent, getAthletes, getEvent, getEventResults, getEvents, getJudges, getSports, removeParticipant, setEventStatus, updateEvent } from '../api.js'
 import { GENDER_OPTIONS } from '../config.js'
 import { formatDate, genderLabel, groupBy } from '../format.js'
 import { openModal, renderAppShell, toast } from '../manage-ui.js'
-import { countryChip, esc, icon, medalChip, skeletonRows, stateMessage, statusBadge, TYPE_COLOR, typeDot, flagImg } from '../ui.js'
+import { countryChip, esc, icon, medalChip, skeletonRows, stateMessage, statusBadge, TYPE_COLOR, typeDot } from '../ui.js'
 
 renderAppShell({ active: 'events', title: 'Event setup', th: 'จัดการรายการแข่งขัน' })
 const app = document.getElementById('app')
 const params = new URLSearchParams(location.search)
-let events = [], sports = [], athletes = [], selected = Number(params.get('id')) || null, filter = '', current = null
+let events = [], sports = [], judges = [], athletes = [], selected = Number(params.get('id')) || null, filter = '', current = null
 
 app.innerHTML = `<div style="display:grid;grid-template-columns:minmax(300px, 360px) minmax(0,1fr);gap:24px;align-items:start">
   <section class="card" aria-labelledby="list-h" style="position:sticky;top:96px;max-height:calc(100vh - 120px);display:flex;flex-direction:column">
@@ -32,8 +31,6 @@ function drawList() {
       ${statusBadge(e.status)}</button>`).join('')}`).join('')
 }
 
-// Sport class and venue boxes appear only with demo data: the backend takes the class from the
-// event name ("Men's 100m T54") and the venue from the sport group.
 const STEPS = [['Details', 'Name, time, venue'], ['Entries', 'Athletes added'], ['Live', 'Results coming in'], ['Results', 'Finished'], ['Medals', 'Gold, silver, bronze']]
 function stepIndex(ev, results) {
   if (results.some((r) => r.medal)) return 5
@@ -46,13 +43,13 @@ function formHtml(ev = {}) {
   const sel = (v, x) => (String(v) === String(x) ? ' selected' : '')
   return `<div class="form-grid">
     <label class="field" style="grid-column:1/-1"><span class="label">Event name</span><input class="input" name="name" required value="${esc(ev.name || '')}" placeholder="Men's 100 m T54 Final"></label>
-    <label class="field"><span class="label">Sport</span><select class="select input" name="sport">${sports.map((s) => `<option value="${s.id}"${sel(ev.sportId, s.id)}>${esc(s.name)} (${esc(s.sport_type)})</option>`).join('')}</select></label>
+    <label class="field"><span class="label">Sport</span><select class="select input" name="sport">${sports.map((s) => `<option value="${s.id}"${sel(ev.sportId, s.id)}>${esc(s.sub_type || s.name)} (${esc(s.sport_type)})</option>`).join('')}</select></label>
     <label class="field"><span class="label">Gender</span><select class="select input" name="gender">${GENDER_OPTIONS.filter((g) => g.value).map((g) => `<option value="${g.value}"${sel(ev.gender, g.value)}>${g.label}</option>`).join('')}</select></label>
-    ${canReopen ? `<label class="field"><span class="label">Sport class</span><input class="input" name="classification" value="${esc(ev.classification || '')}" placeholder="T54"></label>` : ''}
+    <label class="field"><span class="label">Sport class</span><input class="input" name="classification" value="${esc(ev.classification || '')}" placeholder="T54"></label>
     <label class="field"><span class="label">Date</span><input class="input" type="date" name="date" required value="${esc(ev.date || '')}"></label>
     <label class="field"><span class="label">Start time</span><input class="input" type="time" name="start_time" required value="${esc(ev.time || '')}"></label>
-    ${canReopen ? `<label class="field"><span class="label">Venue</span><input class="input" name="venue" value="${esc(ev.venue || '')}" placeholder="Main track"></label>` : ''}
-    <label class="field"><span class="label">${canReopen ? 'Judge' : 'Judge user ID'} <span class="muted" style="font-weight:400">(optional${!canReopen && ev.judge ? `, now ${esc(ev.judge)}` : ''})</span></span><input class="input" name="judge" ${canReopen ? '' : 'inputmode="numeric" placeholder="e.g. 2"'} value="${esc(canReopen ? ev.judge || '' : ev.judgeId ?? '')}"></label>
+    <label class="field"><span class="label">Venue</span><input class="input" name="venue" value="${esc(ev.venue || '')}" placeholder="Main track"></label>
+    <label class="field"><span class="label">Judge <span class="muted" style="font-weight:400">(optional)</span></span><select class="select input" name="judge"><option value="">No judge yet</option>${judges.map((j) => `<option value="${j.id}"${sel(ev.judgeId, j.id)}>${esc(j.username)}</option>`).join('')}</select></label>
   </div>`
 }
 const readForm = (root) => Object.fromEntries([...root.querySelectorAll('[name]')].map((el) => [el.name, el.value.trim()]))
@@ -86,14 +83,14 @@ async function drawEditor() {
         return `<li class="${cls}"${i === step ? ' aria-current="step"' : ''}><span class="step-top"><span class="step-dot">${i < step ? icon('check', 16) : i + 1}</span>${i < 4 ? `<span class="step-line">${i < step ? '<span></span>' : ''}</span>` : ''}</span><span class="stack" style="gap:0"><strong>${l}</strong><span class="small muted">${n}</span></span></li>`
       }).join('')}</ol>
       <div class="between" style="padding:16px 24px;border-top:1px solid var(--border);background:var(--surface-2)">
-        <span class="small muted">Status changes are saved straight away and show on the public site.</span>
+        <span class="small muted">Status follows the real date and time. A change you make here overrides the clock for this event.</span>
         <div class="row" style="flex-wrap:wrap">
           ${ev.status === 'start-list' ? `<button type="button" class="btn btn-primary" data-status="live">${icon('timer', 18)}Start the event</button>` : ''}
           ${ev.status === 'live' ? `<button type="button" class="btn btn-primary" data-status="result">${icon('check', 18)}Finish and publish results</button>` : ''}
-          ${ev.status === 'result' ? `<button type="button" class="btn btn-primary" id="auto">${icon('medal', 18)}Set medals from ranks</button>${canReopen ? '<button type="button" class="btn" data-status="live">Reopen</button>' : ''}` : ''}
+          ${ev.status === 'result' ? `<button type="button" class="btn btn-primary" id="auto">${icon('medal', 18)}Set medals from ranks</button><button type="button" class="btn" data-status="live">Reopen</button>` : ''}
         </div></div>
     </section>
-    <div class="stack" style="gap:24px">
+    <div class="cols-even cols">
       <section class="card card-pad stack anim-rise" style="gap:16px;--i:1" aria-labelledby="det-h">
         <h2 id="det-h">Details</h2><form id="details" class="stack" style="gap:16px">${formHtml(ev)}
           <div class="between"><button type="button" class="btn" id="delete" style="color:var(--danger);border-color:var(--danger)">${icon('trash', 18)}Delete event</button><button type="submit" class="btn btn-primary">${icon('save', 18)}Save changes</button></div></form>
@@ -106,7 +103,7 @@ async function drawEditor() {
         <div id="entries">${entries.length === 0 ? '<p class="card-pad muted">No athletes yet. Add them above.</p>' : entries.map((r, i) => `
           <div class="list-row" style="grid-template-columns:36px minmax(0,1fr) auto auto;padding:10px 24px">
             ${r.rank ? medalChip(r.medal, r.rank) : `<span class="num muted">${i + 1}</span>`}
-            <span class="row" style="min-width:0;gap:8px" title="${esc(countryName(r.country))}">${flagImg(r.country, 'sm')}<strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</strong></span>
+            <span class="row" style="min-width:0">${countryChip(r.country)}<strong style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</strong></span>
             <span class="num" style="font-size:1.125rem">${esc(r.score || '')}</span>
             <button type="button" class="btn btn-icon" data-remove="${r.athleteId}" aria-label="Remove ${esc(r.name)}">${icon('x', 18)}</button></div>`).join('')}</div>
       </section>
@@ -156,8 +153,8 @@ function openNew() {
 document.getElementById('new').addEventListener('click', openNew)
 
 async function refreshList() { events = await getEvents(); drawList() }
-Promise.all([getEvents(), getSports().catch(() => []), getAthletes().catch(() => [])]).then(([e, s, a]) => {
-  events = e; sports = s; athletes = a
+Promise.all([getEvents(), getSports().catch(() => []), getAthletes().catch(() => []), getJudges().catch(() => [])]).then(([e, s, a, j]) => {
+  events = e; sports = s; athletes = a; judges = j
   if (!selected && !params.get('new')) selected = events.find((x) => x.status === 'live')?.id || events[0]?.id || null
   drawList(); drawEditor()
   if (params.get('new')) openNew()

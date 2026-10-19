@@ -35,7 +35,7 @@ export function flagImg(code, size = 'md') {
 }
 export function countryChip(code, withName = false) {
   const c = countryCode(code)
-  return `<span class="row" style="gap:8px;min-width:0${withName ? '' : ';flex:none'}">${flagImg(c)}<span class="country" style="background:${countryColor(c)}" title="${esc(countryName(c))}">${esc(c)}</span>${withName ? `<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(countryName(c))}</span>` : ''}</span>`
+  return `<span class="row" style="gap:8px;min-width:0">${flagImg(c)}<span class="country" style="background:${countryColor(c)}" title="${esc(countryName(c))}">${esc(c)}</span>${withName ? `<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(countryName(c))}</span>` : ''}</span>`
 }
 
 const MEDAL = { gold: 'Gold', silver: 'Silver', bronze: 'Bronze' }
@@ -52,7 +52,7 @@ export function statusBadge(status) {
   return `<span class="badge ${cls}">${ic ? icon(ic, 12) : '<span class="dot" style="background:var(--on-accent)"></span>'}${esc(label)}</span>`
 }
 
-export const TYPE_COLOR = { track: 'var(--track)', field: 'var(--field)', road: 'var(--road)', combined: 'var(--primary)' }
+export const TYPE_COLOR = { track: 'var(--track)', field: 'var(--field)', road: 'var(--road)' }
 export const typeDot = (type) => `<span class="dot" style="background:${TYPE_COLOR[type] || 'var(--border-strong)'}" aria-hidden="true"></span>`
 
 export function pageHeader({ title, th, eyebrow, right = '', photo = '', pos = 'center' }) {

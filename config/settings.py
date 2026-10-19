@@ -141,8 +141,16 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# ---------- CORS (the frontend runs on VS Code Live Server, port 5500) ----------
-CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS', 'http://127.0.0.1:5500,http://localhost:5500')
+# ---------- CORS (which website addresses may call this API) ----------
+# 5500 = VS Code Live Server (our plain HTML frontend), 5173 = Vite/React dev server.
+CORS_ALLOWED_ORIGINS = env_list(
+    'CORS_ALLOWED_ORIGINS',
+    'http://127.0.0.1:5500,http://localhost:5500,http://localhost:5173,http://127.0.0.1:5173',
+)
+if DEBUG:   # while developing, always allow VS Code Live Server, even if an old .env lists other addresses
+    for _origin in ('http://127.0.0.1:5500', 'http://localhost:5500'):
+        if _origin not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_origin)
 
 # ---------- HTTPS hardening (turn on with DJANGO_HTTPS=1 when deployed behind HTTPS) ----------
 if env_bool('DJANGO_HTTPS', False):

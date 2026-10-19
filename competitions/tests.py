@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 from .models import Sport, Athlete, Event, CompetesIn
 
 User = get_user_model()
-WHEN = datetime(2026, 10, 11, 9, 0, tzinfo=timezone.utc)
+WHEN = datetime(2036, 10, 11, 9, 0, tzinfo=timezone.utc)
 
 
 class Base(APITestCase):
@@ -19,7 +19,7 @@ class Base(APITestCase):
         self.admin = User.objects.create_user('admin', password='pw-Admin-123', role='admin')
         self.judge = User.objects.create_user('judge', password='pw-Judge-123', role='judge')
         self.judge2 = User.objects.create_user('judge2', password='pw-Judge-123', role='judge')
-        self.sporter = User.objects.create_user('sporter', password='pw-Sport-123', role='sporter')
+        self.sporter = User.objects.create_user('sporter', password='pw-Sport-123', role='athlete')
         self.track = Sport.objects.create(name='Track', sub_type='Sprinting', rank_order='asc')
         self.field = Sport.objects.create(name='Field', sub_type='High jump', rank_order='desc')
         mk = lambda f, c, g='Men': Athlete.objects.create(first_name=f, last_name=f, country=c, gender=g,
@@ -50,9 +50,12 @@ class AuthTests(Base):
         self.assertEqual(r.status_code, 400)
         self.assertFalse(User.objects.filter(username='x').exists())
 
-    def test_register_sporter_and_judge(self):
-        for role in ('sporter', 'judge'):
-            r = self.client.post('/api/auth/register/', {'username': f'new-{role}', 'password': 'Str0ng-pass-99', 'role': role})
+    def test_register_sporter_and_visitor(self):
+        for role in ('athlete', 'visitor'):
+            data = {'username': f'new-{role}', 'password': 'Str0ng-pass-99', 'role': role}
+            if role == 'athlete':
+                data.update(first_name='New', last_name='Athlete', nationality='Thailand')
+            r = self.client.post('/api/auth/register/', data)
             self.assertEqual(r.status_code, 201)
             self.assertEqual(r.json()['user']['role'], role)
             self.assertIn('token', r.json())
@@ -96,12 +99,12 @@ class PublicReadTests(Base):
             self.assertEqual(self.client.get(url).status_code, 200, url)
 
     def test_event_filters(self):
-        Event.objects.create(name="Women's HJ", date_time=datetime(2026, 10, 12, 9, tzinfo=timezone.utc),
+        Event.objects.create(name="Women's HJ", date_time=datetime(2036, 10, 12, 9, tzinfo=timezone.utc),
                              gender='Women', sport=self.field)
         names = lambda q: [e['name'] for e in self.client.get('/api/events/' + q).json()]
         self.assertEqual(names('?sport_type=Field'), ["Women's HJ"])
         self.assertEqual(names('?gender=men'), ["Men's 100m"])
-        self.assertEqual(names('?date=2026-10-12'), ["Women's HJ"])
+        self.assertEqual(names('?date=2036-10-12'), ["Women's HJ"])
         self.assertEqual(self.client.get('/api/events/?date=12-10-2026').status_code, 400)
 
     def test_athlete_search(self):
@@ -130,7 +133,7 @@ class MedalTableTests(Base):
 
 
 class PermissionTests(Base):
-    EVENT = {'name': 'New', 'date_time': '2026-10-15T09:00:00Z', 'gender': 'Men'}
+    EVENT = {'name': 'New', 'date_time': '2036-10-15T09:00:00Z', 'gender': 'Men'}
 
     def test_create_event_matrix(self):
         body = {**self.EVENT, 'sport': self.track.id}
@@ -330,3 +333,174 @@ class DocsTests(Base):
     def test_schema_and_docs(self):
         self.assertEqual(self.client.get('/api/schema/').status_code, 200)
         self.assertEqual(self.client.get('/api/docs/').status_code, 200)
+
+
+# ---------------- Behaviour the website (frontend) relies on ----------------
+
+class FrontendContractTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.e1, self.e2 = self.enter(self.event, [self.a1, self.a2])
+        self.event.status = 'live'
+        self.event.save()
+
+    def patch(self, entry, data):
+        return self.client.patch(f'/api/results/{entry.id}/', data, format='json')
+
+    def test_add_participant_accepts_athlete_id(self):
+        ev = Event.objects.create(name='Another', date_time=WHEN, gender='Men', sport=self.track)
+        self.as_user(self.admin)
+        r = self.client.post(f'/api/events/{ev.id}/participants/', {'athlete_id': self.a3.id}, format='json')
+        self.assertEqual(r.status_code, 201)
+
+    def test_judge_can_save_a_row_the_way_the_website_sends_it(self):
+        """The website always sends medal=null and empty strings for blank boxes."""
+        self.as_user(self.judge)
+        r = self.patch(self.e1, {'score': '10.52', 'rank': None, 'point': None, 'medal': None})
+        self.assertEqual(r.status_code, 200, r.content)
+        r = self.patch(self.e2, {'score': '', 'rank': None, 'point': None, 'medal': None})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNone(CompetesIn.objects.get(pk=self.e2.pk).score)
+
+    def test_judge_still_cannot_change_a_medal(self):
+        self.as_user(self.admin)
+        self.patch(self.e1, {'medal': 'gold'})
+        self.as_user(self.judge)
+        self.assertEqual(self.patch(self.e1, {'medal': 'gold'}).status_code, 200)     # unchanged = fine
+        self.assertEqual(self.patch(self.e1, {'medal': 'silver'}).status_code, 403)   # changed = admin only
+        self.assertEqual(self.patch(self.e1, {'medal': None}).status_code, 403)
+
+    def test_times_can_be_typed_as_minutes_and_seconds(self):
+        self.as_user(self.judge)
+        r = self.patch(self.e1, {'score': '3:58.10'})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Decimal(r.json()['score']), Decimal('238.10'))
+        self.assertEqual(r.json()['score_display'], '3:58.10')
+        r = self.patch(self.e2, {'score': '1:25:30'})
+        self.assertEqual(r.json()['score_display'], '1:25:30')
+        self.assertEqual(self.patch(self.e2, {'score': '9:xx'}).status_code, 400)
+
+    def test_score_display_for_each_category(self):
+        from .serializers import display_score
+        self.assertEqual(display_score(Decimal('14.2'), 'Track'), '14.20')
+        self.assertEqual(display_score(Decimal('59.99'), 'Road'), '59.99')
+        self.assertEqual(display_score(Decimal('1.6'), 'Field'), '1.60')
+        self.assertEqual(display_score(Decimal('7421'), 'Combined'), '7421')
+        self.assertEqual(display_score(None, 'Track'), '')
+
+    def test_event_json_has_what_the_pages_need(self):
+        self.event.venue, self.event.classification = 'Main Stadium', 'T54'
+        self.event.save()
+        data = self.client.get(f'/api/events/{self.event.id}/').json()
+        self.assertEqual(data['sport']['name'], 'Sprinting')
+        self.assertEqual(data['sport']['sport_type'], 'track')
+        self.assertEqual(data['sport']['id'], self.track.id)
+        self.assertEqual((data['venue'], data['classification'], data['judge_name']), ('Main Stadium', 'T54', 'judge'))
+
+    def test_event_can_be_created_and_edited_with_the_website_form(self):
+        self.as_user(self.admin)
+        body = {'name': 'New 200m', 'sport': self.track.id, 'gender': 'Men', 'classification': 'T54',
+                'date': '2036-10-15', 'start_time': '09:30', 'date_time': '2036-10-15T09:30:00',
+                'venue': 'Main Stadium', 'location': 'Main Stadium'}
+        r = self.client.post('/api/events/', body, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        r = self.client.put(f"/api/events/{r.json()['id']}/", {**body, 'name': 'New 200m final'}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()['name'], 'New 200m final')
+
+    def test_status_accepts_dash_and_reopen(self):
+        self.as_user(self.admin)
+        url = f'/api/events/{self.event.id}/status/'
+        self.assertEqual(self.client.patch(url, {'status': 'result'}, format='json').status_code, 200)
+        self.assertEqual(self.client.patch(url, {'status': 'live'}, format='json').status_code, 200)      # reopen
+        self.assertEqual(self.client.patch(url, {'status': 'start-list'}, format='json').status_code, 400)
+
+    def test_athlete_detail_lists_events_and_hides_unpublished_medals(self):
+        self.as_user(self.admin)
+        self.patch(self.e1, {'score': '10.5', 'medal': 'gold'})
+        data = self.client.get(f'/api/athletes/{self.a1.id}/').json()
+        self.assertEqual(data['sport'], 'Track')
+        self.assertEqual(len(data['events']), 1)
+        self.assertEqual(data['events'][0]['event']['name'], "Men's 100m")
+        self.assertIsNone(data['events'][0]['medal'])              # event is still live
+        self.event.status = 'result'
+        self.event.save()
+        data = self.client.get(f'/api/athletes/{self.a1.id}/').json()
+        self.assertEqual(data['events'][0]['medal'], 'gold')
+
+    def test_athlete_list_stays_light(self):
+        row = self.client.get('/api/athletes/').json()[0]
+        self.assertNotIn('events', row)
+
+    def test_cors_allows_live_server(self):
+        for origin in ('http://127.0.0.1:5500', 'http://localhost:5500', 'http://localhost:5173'):
+            r = self.client.get('/api/medals/', HTTP_ORIGIN=origin)
+            self.assertEqual(r.headers.get('Access-Control-Allow-Origin'), origin)
+        r = self.client.get('/api/medals/', HTTP_ORIGIN='http://evil.example')
+        self.assertIsNone(r.headers.get('Access-Control-Allow-Origin'))
+
+    def test_seed_command_is_repeatable_and_covers_all_categories(self):
+        from django.core.management import call_command
+        call_command('seed_competitions', verbosity=0, force=True)
+        call_command('seed_competitions', verbosity=0, force=True)
+        cats = set(Event.objects.values_list('sport__name', flat=True))
+        self.assertTrue({'Track', 'Field', 'Road', 'Combined'} <= cats)
+        self.assertEqual(Event.objects.filter(name="Men's 100m T54").count(), 1)
+        self.assertTrue(Event.objects.get(name="Men's Marathon T54").venue)
+
+
+class SuperuserRoleTests(Base):
+    def test_createsuperuser_accounts_are_admins(self):
+        boss = User.objects.create_superuser('boss', 'b@example.com', 'pw-Boss-12345')
+        self.assertEqual(boss.role, 'admin')
+        self.as_user(boss)
+        r = self.client.post('/api/events/', {'name': 'X', 'date_time': '2036-10-15T09:00:00Z',
+                                              'gender': 'Men', 'sport': self.track.id}, format='json')
+        self.assertEqual(r.status_code, 201)
+
+
+class ClockStatusTests(Base):
+    """Event status follows the real clock."""
+    def setUp(self):
+        super().setUp()
+        from datetime import timedelta
+        from django.utils import timezone as dj_tz
+        self.now = dj_tz.now()
+        self.td = timedelta
+
+    def make(self, name, start, **kw):
+        ev = Event.objects.create(name=name, date_time=start, gender='Men', sport=self.track, judge=self.judge, **kw)
+        self.enter(ev, [self.a1, self.a2, self.a3], ['10.50', '10.20', '10.90'])
+        return ev
+
+    def test_future_stays_start_list_started_goes_live_old_is_finished_with_medals(self):
+        future = self.make('f', self.now + self.td(hours=5))
+        live = self.make('l', self.now - self.td(minutes=30))
+        done = self.make('d', self.now - self.td(hours=5))
+        got = {e['name']: e['status'] for e in self.client.get('/api/events/').data}
+        self.assertEqual((got['f'], got['l'], got['d']), ('start_list', 'live', 'result'))
+        medals = {m.athlete.first_name: m.medal for m in done.competesin_set.all()}
+        self.assertEqual(medals, {'B': 'gold', 'A': 'silver', 'C': 'bronze'})   # lowest time wins on track
+
+    def test_manual_status_change_overrides_clock(self):
+        ev = self.make('m', self.now - self.td(hours=5), status='live', auto_status=False)
+        self.client.get('/api/events/')
+        ev.refresh_from_db()
+        self.assertEqual(ev.status, 'live')
+
+    def test_judge_can_save_once_event_started(self):
+        ev = self.make('j', self.now - self.td(minutes=10))
+        entry = ev.competesin_set.first()
+        self.as_user(self.judge)
+        r = self.client.patch(f'/api/results/{entry.id}/', {'score': '9.99'}, format='json')
+        self.assertEqual(r.status_code, 200)
+
+    def test_judge_cannot_save_before_start(self):
+        ev = self.make('j', self.now + self.td(hours=2))
+        self.as_user(self.judge)
+        r = self.client.patch(f'/api/results/{ev.competesin_set.first().id}/', {'score': '9.99'}, format='json')
+        self.assertEqual(r.status_code, 403)
+
+    def test_medal_table_counts_clock_finished_events(self):
+        self.make('d', self.now - self.td(hours=5))
+        self.assertEqual(self.client.get('/api/medals/').data[0]['gold'], 1)

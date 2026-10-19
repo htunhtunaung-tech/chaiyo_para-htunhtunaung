@@ -43,15 +43,11 @@ function guard(active) {
   throw new Error('Staff page blocked: not signed in or not allowed')
 }
 
-// Admin-only links are hidden from judges, and event links open Results entry for them.
-export const isAdmin = () => getUser()?.role === 'admin'
-export const eventLink = (id) => (isAdmin() ? `events-admin.html?id=${id}` : `results-entry.html?id=${id}`)
-
 // Draws the sidebar and top bar around <main id="app">.
 export function renderAppShell({ active, title, th = '', badges = {} }) {
   const me = guard(active)
   document.body.classList.add('staff')
-  const items = NAV.filter((n) => canOpen(me, n.key)).map((n) => `<a href="${n.href}" class="side-link${n.key === active ? ' active' : ''}"${n.key === active ? ' aria-current="page"' : ''}>
+  const items = NAV.map((n) => `<a href="${n.href}" class="side-link${n.key === active ? ' active' : ''}"${n.key === active ? ' aria-current="page"' : ''}>
       ${icon(n.icon, 20)}<span>${n.label}</span>${badges[n.key] ? `<span class="side-badge">${esc(badges[n.key])}</span>` : ''}</a>`).join('')
   document.body.insertAdjacentHTML('afterbegin', `
     <a class="skip-link" href="#main">Skip to main content</a>

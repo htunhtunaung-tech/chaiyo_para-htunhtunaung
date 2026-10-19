@@ -2,7 +2,7 @@
 // Each row saves with PATCH /api/results/<id>/.
 import { autoMedals, getEvent, getEventResults, getEvents, setEventStatus, updateResult } from '../api.js'
 import { formatDate, genderLabel } from '../format.js'
-import { renderAppShell, toast, isAdmin } from '../manage-ui.js'
+import { renderAppShell, toast } from '../manage-ui.js'
 import { countryChip, esc, flip, icon, medalChip, skeletonRows, stateMessage, statusBadge, TYPE_COLOR, typeDot } from '../ui.js'
 
 renderAppShell({ active: 'results', title: 'Results entry', th: 'บันทึกผลการแข่งขัน' })
@@ -13,7 +13,7 @@ const COLS = '48px minmax(0,1.6fr) 56px 140px 96px 96px 150px 104px'
 app.innerHTML = `<div class="stack">
   <section class="card card-pad between anim-rise">
     <label class="field" style="flex:1;max-width:520px"><span class="label">Event</span><select class="select input" id="pick"></select></label>
-    <div class="row small muted">${icon('alert', 18)}${isAdmin() ? 'Each row saves on its own. Medals are set by admins.' : 'Judges can enter results for their own events while they are live. Admins set the medals.'}</div>
+    <div class="row small muted">${icon('alert', 18)}Only admins and judges can save. Each row saves on its own.</div>
   </section>
   <div id="sheet" class="stack"><div class="card">${skeletonRows(8)}</div></div>
 </div>`
@@ -35,18 +35,18 @@ function draw(animate = true) {
       </div>
       <div class="progress" style="margin:0 24px 16px" aria-hidden="true"><span style="width:${rows.length ? (done / rows.length) * 100 : 0}%"></span></div>
       <div class="between" style="padding:14px 24px;border-top:1px solid var(--border);background:var(--surface-2)">
-        <span class="small muted">${event.status === 'start-list' ? 'Start the event to enter results.' : event.status === 'live' ? 'Results show on the public site as soon as you save them.' : 'Results are published. Set the medals when the ranks are final.'}</span>
+        <span class="small muted">${event.status === 'start-list' ? 'Results open when the event starts (automatically at its start time, or when an admin starts it).' : event.status === 'live' ? 'Results show on the public site as soon as you save them.' : 'Results are published. Set the medals when the ranks are final.'}</span>
         <div class="row" style="flex-wrap:wrap">
           <button type="button" class="btn" id="sort">${icon('swap', 18)}Sort by rank</button>
           <button type="button" class="btn" id="rank">${icon('flag', 18)}Rank from results</button>
-          ${!isAdmin() ? '' : event.status === 'start-list' ? `<button type="button" class="btn btn-primary" data-status="live">${icon('timer', 18)}Start the event</button>` : ''}
-          ${isAdmin() && event.status === 'live' ? `<button type="button" class="btn btn-primary" data-status="result">${icon('check', 18)}Finish and publish</button>` : ''}
-          ${isAdmin() && event.status === 'result' ? `<button type="button" class="btn btn-primary" id="auto">${icon('medal', 18)}Set medals from ranks</button>` : ''}
+          ${event.status === 'start-list' ? `<button type="button" class="btn btn-primary" data-status="live">${icon('timer', 18)}Start the event</button>` : ''}
+          ${event.status === 'live' ? `<button type="button" class="btn btn-primary" data-status="result">${icon('check', 18)}Finish and publish</button>` : ''}
+          ${event.status === 'result' ? `<button type="button" class="btn btn-primary" id="auto">${icon('medal', 18)}Set medals from ranks</button>` : ''}
         </div></div>
     </section>
     <section class="card" aria-labelledby="sheet-h">
       <div class="card-head"><h2 id="sheet-h">Result sheet</h2><button type="button" class="btn btn-primary" id="save-all">${icon('save', 18)}Save all changes</button></div>
-      ${rows.length === 0 ? stateMessage({ title: 'No athletes in this event', text: isAdmin() ? 'Add athletes on the Event setup page first.' : 'An admin adds athletes on the Event setup page.', action: isAdmin() ? `<a class="btn" href="events-admin.html?id=${event.id}">Event setup</a>` : '' }) : `
+      ${rows.length === 0 ? stateMessage({ title: 'No athletes in this event', text: 'Add athletes on the Event setup page first.', action: `<a class="btn" href="events-admin.html?id=${event.id}">Event setup</a>` }) : `
       <div style="overflow-x:auto"><div style="min-width:920px">
         <div class="table-head" style="grid-template-columns:${COLS}"><span>Place</span><span>Athlete</span><span class="center">Lane</span><span>Result</span><span>Rank</span><span>Points</span><span>Medal</span><span></span></div>
         <div class="flip-list">${rows.map((r, i) => `
@@ -57,7 +57,7 @@ function draw(animate = true) {
             <label><span class="visually-hidden">Result for ${esc(r.name)}</span><input class="input-sm num" name="score" value="${esc(r.score)}" placeholder="${event.type === 'field' ? 'm' : 'time'}" inputmode="decimal" style="font-size:1.125rem" ${event.status === 'start-list' ? 'disabled' : ''}></label>
             <label><span class="visually-hidden">Rank for ${esc(r.name)}</span><input class="input-sm" name="rank" type="number" min="1" value="${r.rank ?? ''}" ${event.status === 'start-list' ? 'disabled' : ''}></label>
             <label><span class="visually-hidden">Points for ${esc(r.name)}</span><input class="input-sm" name="point" type="number" min="0" value="${r.points ?? ''}" ${event.status === 'start-list' ? 'disabled' : ''}></label>
-            <label><span class="visually-hidden">Medal for ${esc(r.name)}</span><select class="input-sm" name="medal" ${event.status === 'start-list' || !isAdmin() ? 'disabled' : ''}>${[['', 'None'], ['gold', 'Gold'], ['silver', 'Silver'], ['bronze', 'Bronze']].map(([v, l]) => `<option value="${v}"${(r.medal || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+            <label><span class="visually-hidden">Medal for ${esc(r.name)}</span><select class="input-sm" name="medal" ${event.status === 'start-list' ? 'disabled' : ''}>${[['', 'None'], ['gold', 'Gold'], ['silver', 'Silver'], ['bronze', 'Bronze']].map(([v, l]) => `<option value="${v}"${(r.medal || '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
             <button type="submit" class="btn" data-save disabled>${icon('save', 16)}Save</button>
           </form>`).join('')}</div></div></div>`}
     </section>`
@@ -105,7 +105,7 @@ sheet.addEventListener('click', async (e) => {
   if (e.target.closest('#rank')) {
     // Works out ranks from the typed results: lowest time wins on track and road, longest mark wins in the field.
     const val = (s) => { const p = String(s).split(':').map(Number); return p.reduce((t, x) => t * 60 + x, 0) }
-    const high = event.higherWins ?? (event.type === 'field' || event.type === 'combined')
+    const high = event.type === 'field'
     const scored = rows.filter((r) => r.score).sort((a, b) => (high ? val(b.score) - val(a.score) : val(a.score) - val(b.score)))
     scored.forEach((r, i) => { r.rank = i + 1; r.points = i < 8 ? 8 - i : 0 })
     rows.filter((r) => !r.score).forEach((r) => { r.rank = null })

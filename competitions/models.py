@@ -28,6 +28,12 @@ class Athlete(models.Model):
     country = models.CharField(max_length=100)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     classification = models.CharField(max_length=50)       # e.g. T54, F46
+    # Competition identity is separate from the login account; this optional one-to-one
+    # link lets an existing athlete account own a competition profile without changing roles.
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='competition_athlete', limit_choices_to={'role': 'athlete'},
+    )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.country})"
@@ -45,6 +51,11 @@ class Event(models.Model):
     date_time = models.DateTimeField(db_index=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='start_list', db_index=True)
+    venue = models.CharField(max_length=150, blank=True)               # e.g. "Main Stadium"
+    classification = models.CharField(max_length=50, blank=True)      # e.g. T54, F46
+    # True = the clock decides the status (start list -> live at the start time -> finished after the
+    # event's duration). An admin who changes the status by hand switches this off for that event.
+    auto_status = models.BooleanField(default=True)
     sport = models.ForeignKey(Sport, on_delete=models.PROTECT)
     judge = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
                               limit_choices_to={'role': 'judge'})

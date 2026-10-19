@@ -1,24 +1,23 @@
 // Admin dashboard: what needs attention, today's events, finals by day, medal leaders.
-import { getAthletes } from '../api.js'
+import { getAthletes, getJudges, isMock } from '../api.js'
 import { POLL_MS } from '../config.js'
 import { loadEventsWithResults, medalTable, days, today } from '../data.js'
-import { getBookings, getUsers } from '../demo-data.js'
+import { getBookings } from '../demo-data.js'
 import { formatDate } from '../format.js'
-import { eventLink, isAdmin, renderAppShell, statCard } from '../manage-ui.js'
+import { renderAppShell, statCard } from '../manage-ui.js'
 import { animateNumbers, countryChip, esc, icon, poll, skeletonRows, statusBadge, TYPE_COLOR, typeDot } from '../ui.js'
 
-const waiting = getUsers().filter((u) => u.status === 'waiting').length
 const pendingBookings = getBookings().filter((b) => b.status === 'pending').length
-renderAppShell({ active: 'dashboard', title: 'Dashboard', th: 'แดชบอร์ดผู้ดูแลการแข่งขัน', badges: { admin: waiting || '', venues: pendingBookings || '' } })
+renderAppShell({ active: 'dashboard', title: 'Dashboard', th: 'แดชบอร์ดผู้ดูแลการแข่งขัน', badges: { venues: pendingBookings || '' } })
 const app = document.getElementById('app')
-let athletesCount = 0, firstDraw = true, lastKey = ''
+let athletesCount = 0, firstDraw = true, lastKey = '', pendingJudges = []
 
 app.innerHTML = `<div class="stack">
   <section class="between anim-rise photo-banner" style="--pos:center 62%">
     <div class="photo-layer" aria-hidden="true" style="background-image:url('images/banner-blocks.webp')"></div>
     <div class="stack" style="gap:4px"><span class="eyebrow">Para Athletics Open · Staff dashboard</span><h2 style="font-size:1.75rem">Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}</h2>
       <p class="muted" id="summary">Loading the meet…</p></div>
-    ${isAdmin() ? `<div class="row" style="flex-wrap:wrap"><a href="announcements.html" class="btn">${icon('mega', 18)}New announcement</a><a href="events-admin.html?new=1" class="btn btn-primary">${icon('plus', 18)}New event</a></div>` : `<div class="row"><a href="results-entry.html" class="btn btn-primary">${icon('timer', 18)}Enter results</a></div>`}
+    <div class="row" style="flex-wrap:wrap"><a href="announcements.html" class="btn">${icon('mega', 18)}New announcement</a><a href="events-admin.html?new=1" class="btn btn-primary">${icon('plus', 18)}New event</a></div>
   </section>
   <section class="stats" id="stats">${skeletonRows(1)}</section>
   <div class="cols">
@@ -36,21 +35,21 @@ app.innerHTML = `<div class="stack">
 </div>`
 
 function draw(events) {
-  const key = JSON.stringify([athletesCount, events.map((e) => [e.id, e.status, e.results.map((r) => [r.rank, r.medal])])])
+  const key = JSON.stringify([athletesCount, pendingJudges.map((u) => u.id), events.map((e) => [e.id, e.status, e.results.map((r) => [r.rank, r.medal])])])
   if (key === lastKey) return // nothing changed: keep the page still
   lastKey = key
   const decided = events.filter((e) => e.status === 'result').length
   const live = events.filter((e) => e.status === 'live')
   const needMedals = events.filter((e) => e.status === 'result' && e.results.some((r) => r.rank) && !e.results.some((r) => r.medal))
   const pending = getBookings().filter((b) => b.status === 'pending')
-  const users = getUsers().filter((u) => u.status === 'waiting')
+  const users = pendingJudges
   document.getElementById('summary').textContent = `${live.length} ${live.length === 1 ? 'event is' : 'events are'} live now. ${decided} of ${events.length} events have results.`
 
   document.getElementById('stats').innerHTML = [
     statCard({ label: 'Athletes', key: 'd-ath', value: athletesCount, note: 'Across all delegations', icon: 'users', href: 'delegation.html', i: 0 }),
-    statCard({ label: 'Events decided', key: 'd-dec', value: decided, note: `of ${events.length} events`, icon: 'flag', href: isAdmin() ? 'events-admin.html' : 'results-entry.html', i: 1 }),
+    statCard({ label: 'Events decided', key: 'd-dec', value: decided, note: `of ${events.length} events`, icon: 'flag', href: 'events-admin.html', i: 1 }),
     statCard({ label: 'Live now', key: 'd-live', value: live.length, note: 'Results being entered', icon: 'timer', tone: 'warn', href: 'results-entry.html', i: 2 }),
-    statCard({ label: 'Waiting for you', key: 'd-wait', value: (isAdmin() ? pending.length + users.length : 0) + needMedals.length, note: isAdmin() ? 'Bookings, accounts and medals' : 'Events waiting for medals', icon: 'bell', tone: 'warn', i: 3 }),
+    statCard({ label: 'Waiting for you', key: 'd-wait', value: pending.length + users.length + needMedals.length, note: 'Bookings, accounts and medals', icon: 'bell', tone: 'warn', i: 3 }),
   ].join('')
   if (!firstDraw) document.querySelectorAll('#stats .anim-rise').forEach((el) => el.classList.remove('anim-rise'))
   const pct = events.length ? Math.round((decided / events.length) * 100) : 0
@@ -59,8 +58,8 @@ function draw(events) {
   const items = [
     ...live.map((e) => ['warn', 'timer', e.name, 'Live now. Enter results as they come in.', `results-entry.html?id=${e.id}`, 'Enter results', 'Live']),
     ...needMedals.map((e) => ['info', 'medal', e.name, 'Results are in but no medals are set.', `results-entry.html?id=${e.id}`, 'Set medals', 'Medals']),
-    ...(isAdmin() && pending.length ? [['danger', 'pin', `${pending.length} venue ${pending.length === 1 ? 'request' : 'requests'}`, pending.map((b) => `${b.team} · ${b.facility}`).slice(0, 3).join(', '), 'venues.html', 'Review', 'Venues']] : []),
-    ...(isAdmin() && users.length ? [['info', 'users', `${users.length} accounts waiting`, users.map((u) => u.name).slice(0, 3).join(', '), 'admin.html', 'Open', 'Accounts']] : []),
+    ...(pending.length ? [['danger', 'pin', `${pending.length} venue ${pending.length === 1 ? 'request' : 'requests'}`, pending.map((b) => `${b.team} · ${b.facility}`).slice(0, 3).join(', '), 'venues.html', 'Review', 'Venues']] : []),
+    ...(users.length ? [['info', 'users', `${users.length} judge ${users.length === 1 ? 'request' : 'requests'} waiting`, users.map((u) => u.username).slice(0, 3).join(', '), 'admin.html', 'Open', 'Accounts']] : []),
   ]
   document.getElementById('att-count').textContent = `${items.length} open`
   document.getElementById('attention').innerHTML = items.length === 0 ? '<p class="card-pad muted">Nothing needs you right now.</p>' : items.map(([tone, ic, title, text, href, cta, tag], i) => `
@@ -71,7 +70,7 @@ function draw(events) {
 
   const upcoming = events.filter((e) => e.status !== 'result').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 6)
   document.getElementById('next').innerHTML = upcoming.map((e, i) => `
-    <a href="${eventLink(e.id)}" class="list-row" style="grid-template-columns:64px minmax(0,1fr) auto;text-decoration:none;color:var(--text)">
+    <a href="events-admin.html?id=${e.id}" class="list-row" style="grid-template-columns:64px minmax(0,1fr) auto;text-decoration:none;color:var(--text)">
       <span class="stack" style="gap:0"><span class="num" style="font-size:1.25rem">${esc(e.time)}</span><span class="small muted">${esc(formatDate(e.date, { day: 'numeric', month: 'short' }))}</span></span>
       <span class="stack" style="gap:2px;min-width:0"><strong>${esc(e.name)}</strong><span class="row small muted" style="align-items:baseline">${typeDot(e.type)}<span>${esc(e.venue)} · ${e.results.length || 0} athletes</span></span></span>
       ${statusBadge(e.status)}</a>`).join('') || '<p class="card-pad muted">Every event has finished.</p>'
@@ -99,4 +98,12 @@ function draw(events) {
 }
 
 getAthletes().then((a) => { athletesCount = a.length }).catch(() => {})
-poll(loadEventsWithResults, POLL_MS, { onData: draw, onError: (err) => { document.getElementById('summary').textContent = err.message } })
+// Judge requests waiting for approval are real accounts (admins only; judges just get an empty list).
+async function refreshPending() {
+  if (isMock) return
+  try { pendingJudges = await getJudges('pending') } catch { pendingJudges = [] }
+  const link = document.querySelector('a[href="admin.html"]')
+  if (link && !link.querySelector('.side-badge')) { if (pendingJudges.length) link.insertAdjacentHTML('beforeend', `<span class="side-badge">${pendingJudges.length}</span>`) }
+  else if (link) { const b = link.querySelector('.side-badge'); if (pendingJudges.length) b.textContent = pendingJudges.length; else b.remove() }
+}
+poll(async () => { const evs = await loadEventsWithResults(); await refreshPending(); return evs }, POLL_MS, { onData: draw, onError: (err) => { document.getElementById('summary').textContent = err.message } })

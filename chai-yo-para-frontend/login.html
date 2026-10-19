@@ -65,9 +65,19 @@
               <input class="input" name="email" type="email" autocomplete="email"></label>
             <label class="auth-field"><span class="label">Role</span>
               <select class="select input" name="role">
-                <option value="sporter">Sporter</option>
-                <option value="judge">Judge</option>
+                <option value="athlete">Athlete</option>
+                <option value="team_official">Team Official (coach, team manager, technician)</option>
+                <option value="visitor">Visitor</option>
+                <option value="judge">Judge (needs admin approval)</option>
               </select></label>
+            <div id="athlete-fields" class="auth-form" style="gap:12px">
+              <label class="auth-field"><span class="label">First name</span><input class="input" name="first_name" autocomplete="given-name"></label>
+              <label class="auth-field"><span class="label">Last name</span><input class="input" name="last_name" autocomplete="family-name"></label>
+              <label class="auth-field"><span class="label">Nationality</span><input class="input" name="nationality" autocomplete="country-name" placeholder="e.g. Thailand"></label>
+              <label class="auth-field"><span class="label">Gender <span class="muted" style="font-weight:400">(optional)</span></span>
+                <select class="select input" name="gender"><option value="">Select gender</option><option value="Men">Men</option><option value="Women">Women</option></select></label>
+              <label class="auth-field"><span class="label">Classification <span class="muted" style="font-weight:400">(optional)</span></span><input class="input" name="classification" placeholder="e.g. T54, F46"></label>
+            </div>
             <label class="auth-field"><span class="label">Password</span>
               <input class="input" name="password" type="password" autocomplete="new-password" required minlength="6"></label>
             <label class="auth-field"><span class="label">Confirm password</span>
@@ -99,9 +109,21 @@
       $('form-in').hidden = up; $('form-up').hidden = !up
       $('tab-in').setAttribute('aria-pressed', String(!up)); $('tab-up').setAttribute('aria-pressed', String(up))
       $('auth-title').textContent = up ? 'Create an account' : 'Sign in'
-      err.textContent = ''
+      err.textContent = ''; err.style.color = ''
       ;(up ? $('form-up') : $('form-in')).querySelector('input').focus()
     }
+    const roleSelect = $('form-up').elements.role
+    const athleteFields = $('athlete-fields')
+    function updateAthleteFields() {
+      const isAthlete = roleSelect.value === 'athlete'
+      athleteFields.hidden = !isAthlete
+      for (const name of ['first_name', 'last_name', 'nationality']) athleteFields.elements?.[name] && (athleteFields.elements[name].required = isAthlete)
+      athleteFields.querySelector('[name=first_name]').required = isAthlete
+      athleteFields.querySelector('[name=last_name]').required = isAthlete
+      athleteFields.querySelector('[name=nationality]').required = isAthlete
+    }
+    roleSelect.addEventListener('change', updateAthleteFields)
+    updateAthleteFields()
     $('tab-in').addEventListener('click', () => show('in'))
     $('tab-up').addEventListener('click', () => show('up'))
     if (params.get('mode') === 'register') show('up')
@@ -127,8 +149,24 @@
       if (f.password !== f.confirm) { err.textContent = 'The two passwords do not match.'; return }
       const body = { username: f.username, password: f.password, role: f.role }
       if (f.email.trim()) body.email = f.email.trim()
+      if (f.role === 'athlete') {
+        body.first_name = String(f.first_name || '').trim()
+        body.last_name = String(f.last_name || '').trim()
+        body.nationality = String(f.nationality || '').trim()
+        body.gender = String(f.gender || '')
+        body.classification = String(f.classification || '').trim()
+      }
       busy(btn, true, 'Create account')
-      try { done(await register(body)) } catch (ex) { err.textContent = ex.message; busy(btn, false, 'Create account') }
+      try {
+        const out = await register(body)
+        if (out.pending) {   // judge request: no sign in until an admin approves it
+          e.target.reset(); busy(btn, false, 'Create account'); show('in')
+          err.style.color = 'var(--warn, #b45309)'
+          err.textContent = 'Judge request sent. Your account is pending: an admin must approve it before you can sign in.'
+          return
+        }
+        done(out.user)
+      } catch (ex) { err.textContent = ex.message; busy(btn, false, 'Create account') }
     })
   </script>
 </body>

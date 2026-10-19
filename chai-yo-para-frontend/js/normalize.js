@@ -33,18 +33,9 @@ export function normalizeMedals(data) {
 
 function normalizeSport(s) {
   if (!s) return { name: '', type: '' }
-  if (typeof s === 'number') return { id: s, name: '', type: '' } // just the id (Chai-Yo backend)
   if (typeof s !== 'object') return { name: String(s), type: '' }
   return { id: s.id, name: pick(s, 'name', 'title') || '', type: String(pick(s, 'sport_type', 'type', 'category') || '').toLowerCase() }
 }
-
-// Chai-Yo backend: sport_name is the group (Track / Field / Road / Combined) and
-// sport_sub_type the discipline, e.g. "Sprinting (วิ่งระยะสั้น)". Show the English part.
-const englishPart = (s) => String(s || '').replace(/\s*\(.*\)\s*$/, '').trim()
-// No venue or class field on the backend: take the class from the name ("Men's 100m T54")
-// and give each group its usual venue.
-const VENUE_BY_TYPE = { track: 'Main track', field: 'Throws and jumps area', road: 'Road course', combined: 'Main track' }
-const classFromName = (n) => (String(n || '').match(/\b([TF]\d{2})\b/) || [])[1] || ''
 
 export function normalizeEvent(e) {
   const sport = normalizeSport(e.sport)
@@ -54,19 +45,17 @@ export function normalizeEvent(e) {
   return {
     id: e.id,
     name: pick(e, 'name', 'title', 'event_name') || 'Event',
-    sport: sport.name || englishPart(pick(e, 'sport_sub_type')) || pick(e, 'sport_name') || '',
+    sport: sport.name || pick(e, 'sport_name') || '',
     sportId: sport.id ?? (typeof e.sport !== 'object' ? e.sport : undefined),
-    type: (sport.type || String(pick(e, 'sport_type', 'type', 'sport_name') || '')).toLowerCase(),
-    // true when the highest mark wins (field, combined); false when the lowest time wins
-    higherWins: e.rank_order ? e.rank_order === 'desc' : undefined,
+    type: (sport.type || String(pick(e, 'sport_type', 'type') || '')).toLowerCase(),
     gender: genderCode(pick(e, 'gender', 'sex')),
-    classification: pick(e, 'classification', 'class_name', 'sport_class') || classFromName(pick(e, 'name', 'title')),
+    classification: pick(e, 'classification', 'class_name', 'sport_class') || '',
     date: date || '',
     time: start ? String(start).slice(String(start).length > 10 ? 11 : 0, String(start).length > 10 ? 16 : 5) : '',
-    venue: pick(e, 'venue', 'location', 'place') || VENUE_BY_TYPE[String(pick(e, 'sport_type', 'sport_name') || sport.type || '').toLowerCase()] || '',
+    venue: pick(e, 'venue', 'location', 'place') || '',
     status: String(pick(e, 'status') || 'start-list').toLowerCase().replace('_', '-').replace(' ', '-'),
-    judge: e.judge && typeof e.judge === 'object' ? pick(e.judge, 'username', 'name') : pick(e, 'judge_name') || (typeof e.judge === 'string' ? e.judge : ''),
-    judgeId: typeof e.judge === 'number' ? e.judge : undefined,
+    judgeId: typeof e.judge === 'number' ? e.judge : e.judge?.id ?? null,
+    judge: typeof e.judge === 'object' ? pick(e.judge, 'username', 'name') : pick(e, 'judge_name', 'judge') || '',
     participants: e.participants ? asList(e.participants).map(normalizeResult) : [],
   }
 }
@@ -81,7 +70,8 @@ export function normalizeResult(r) {
     athleteId: pick(a, 'id') ?? (typeof r.athlete !== 'object' ? r.athlete : undefined) ?? pick(r, 'athlete_id'),
     name: pick(a, 'name', 'full_name') || [a.first_name, a.last_name].filter(Boolean).join(' ') || pick(r, 'athlete_name', 'name') || 'Athlete',
     country: countryCode(pick(a, 'country', 'country_code', 'nationality') || pick(r, 'country', 'country_code')),
-    score: pick(r, 'score', 'result', 'mark', 'time') ?? '',
+    // score_display is the backend's ready-to-show text (3:58.10, 14.20 ...)
+    score: pick(r, 'score_display', 'score', 'result', 'mark', 'time') ?? '',
     points: pick(r, 'point', 'points') ?? '',
     rank: rank === undefined || rank === '' ? null : Number(rank),
     medal: ['gold', 'silver', 'bronze'].includes(medal) ? medal : medal === '1' ? 'gold' : medal === '2' ? 'silver' : medal === '3' ? 'bronze' : '',
@@ -101,12 +91,11 @@ export function normalizeAthlete(a) {
       eventId: ev?.id ?? (typeof x.event !== 'object' ? x.event : undefined) ?? pick(x, 'event_id'),
       eventName: ev?.name || pick(x, 'event_name', 'name') || 'Event',
       date: ev?.date || pick(x, 'date') || '',
-      status: ev?.status || '',
       score: res.score, rank: res.rank, medal: res.medal, points: res.points,
     }
   })
   return {
-    id: a.id, name,
+    id: a.id, name, user: a.user ?? null, user_username: a.user_username || '', user_email: a.user_email || '',
     country: countryCode(pick(a, 'country', 'country_code', 'nationality')),
     gender: genderCode(pick(a, 'gender', 'sex')),
     classification: pick(a, 'classification', 'sport_class', 'class_name') || '',

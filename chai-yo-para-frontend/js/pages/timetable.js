@@ -3,7 +3,7 @@ import { getEvents } from '../api.js'
 import { POLL_MS } from '../config.js'
 import { days, nowMinutes, today, toMinutes } from '../data.js'
 import { formatDate } from '../format.js'
-import { renderAppShell, eventLink, isAdmin } from '../manage-ui.js'
+import { renderAppShell } from '../manage-ui.js'
 import { esc, icon, poll, skeletonRows, statusBadge, TYPE_COLOR } from '../ui.js'
 
 renderAppShell({ active: 'timetable', title: 'Timetable', th: 'ตารางเวลาการแข่งขัน' })
@@ -17,7 +17,7 @@ app.innerHTML = `<div class="stack">
     <div class="chips" role="tablist" aria-label="Competition day" id="days"></div>
     <div class="row" style="flex-wrap:wrap">
       <div class="seg" role="group" aria-label="Event group" id="groups">${[['', 'All'], ['track', 'Track'], ['field', 'Field'], ['road', 'Road']].map(([v, l]) => `<button type="button" data-g="${v}" aria-pressed="${v === ''}">${l}</button>`).join('')}</div>
-      ${isAdmin() ? `<a href="events-admin.html?new=1" class="btn btn-primary">${icon('plus', 18)}Add event</a>` : ''}</div>
+      <a href="events-admin.html?new=1" class="btn btn-primary">${icon('plus', 18)}Add event</a></div>
   </section>
   <section class="card card-pad anim-rise" style="--i:1;overflow-x:auto" aria-labelledby="tt-h">
     <div class="between" style="margin-bottom:12px"><h2 id="tt-h">Timetable</h2>
@@ -53,7 +53,7 @@ function draw() {
       <div style="position:relative">${ticks.map((m) => `<span class="num small" style="position:absolute;top:${(m - from) * PX}px;transform:translateY(2px);color:var(--text-2);font-size:.9375rem">${label(m)}</span>`).join('')}</div>
       ${venues.map((v) => `<div class="tt-col">${list.filter((e) => (e.venue || 'Venue to be confirmed') === v).map((e, i) => {
         const len = LENGTH[e.type] || 30, h = Math.max(len * PX - 4, 30), tall = h >= 64
-        return `<a href="${eventLink(e.id)}" class="tt-block${e.status === 'live' ? ' is-live' : e.status === 'result' ? ' is-done' : ''}" style="--type:${TYPE_COLOR[e.type] || 'var(--border-strong)'};--i:${i};top:${(toMinutes(e.time) - from) * PX}px;height:${h}px">
+        return `<a href="events-admin.html?id=${e.id}" class="tt-block${e.status === 'live' ? ' is-live' : e.status === 'result' ? ' is-done' : ''}" style="--type:${TYPE_COLOR[e.type] || 'var(--border-strong)'};--i:${i};top:${(toMinutes(e.time) - from) * PX}px;height:${h}px">
           ${tall ? `<span class="row" style="justify-content:space-between;gap:6px"><span class="num" style="font-size:.9375rem">${esc(e.time)}</span>${e.status === 'live' ? '<span class="badge badge-live pulse" style="height:18px;font-size:.6875rem">LIVE</span>' : e.status === 'result' ? `<span style="color:var(--ok)" aria-label="Results in">${icon('check', 14)}</span>` : ''}</span><strong>${esc(e.name)}</strong><span class="muted">${e.participants.length} athletes</span>`
             : `<span class="row" style="gap:8px;flex-wrap:nowrap;min-width:0"><span class="num" style="font-size:.9375rem;flex:none">${esc(e.time)}</span><strong style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.name)}</strong>${e.status === 'live' ? '<span class="badge badge-live pulse" style="height:18px;font-size:.6875rem">LIVE</span>' : e.status === 'result' ? `<span style="color:var(--ok)" aria-label="Results in">${icon('check', 14)}</span>` : ''}</span>`}</a>`
       }).join('')}</div>`).join('')}

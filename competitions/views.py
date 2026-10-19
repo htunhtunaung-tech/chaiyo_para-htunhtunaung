@@ -11,11 +11,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Sport, Athlete, Event, CompetesIn
+from .schedule import sync_event_statuses
 from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrJudge
-from .serializers import (SportSerializer, AthleteSerializer, AthleteDetailSerializer, EventSerializer, ResultSerializer,
-                          ParticipantInputSerializer, StatusInputSerializer)
+from .serializers import (SportSerializer, AthleteSerializer, AthleteDetailSerializer, EventSerializer,
+                          ResultSerializer, ParticipantInputSerializer, StatusInputSerializer)
 
 STATUS_FLOW = ['start_list', 'live', 'result']
+ALLOWED_BACK_STEPS = {('result', 'live')}          # admin may reopen a published event
 RESULT_ORDER = (F('rank').asc(nulls_last=True), 'athlete__last_name', 'athlete__first_name')
 
 
@@ -38,6 +40,7 @@ class MedalTableView(APIView):
 
     @extend_schema(responses={200: dict})
     def get(self, request):
+        sync_event_statuses()
         rows = (CompetesIn.objects
                 .filter(event__status='result', medal__in=['gold', 'silver', 'bronze'])
                 .values('athlete__country')
@@ -68,6 +71,13 @@ class AthleteViewSet(ProtectedDeleteMixin, viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['first_name', 'last_name', 'country', 'classification']   # ?search=
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == 'retrieve':
+            sync_event_statuses()
+            qs = qs.prefetch_related('competesin_set__event__sport')
+        return qs
+
     def get_serializer_class(self):
         return AthleteDetailSerializer if self.action == 'retrieve' else AthleteSerializer
 
@@ -77,7 +87,8 @@ class EventViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
-        qs = Event.objects.select_related('sport', 'judge').prefetch_related('competesin_set__athlete')
+        sync_event_statuses()                              # statuses follow the real date and time
+        qs = Event.objects.select_related('sport', 'judge')
         p = self.request.query_params
         if p.get('gender'):
             qs = qs.filter(gender__iexact=p['gender'])
@@ -99,7 +110,7 @@ class EventViewSet(viewsets.ModelViewSet):
     def results(self, request, pk=None):
         """GET /api/events/<id>/results/ - public."""
         event = self.get_object()
-        qs = event.competesin_set.select_related('athlete').order_by(*RESULT_ORDER)
+        qs = event.competesin_set.select_related('athlete', 'event__sport').order_by(*RESULT_ORDER)
         return Response(ResultSerializer(qs, many=True, context={'request': request}).data)
 
     @extend_schema(request=ParticipantInputSerializer, responses=ResultSerializer)
@@ -139,12 +150,14 @@ class EventViewSet(viewsets.ModelViewSet):
         data = StatusInputSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         new = data.validated_data['status']
-        if STATUS_FLOW.index(new) != STATUS_FLOW.index(event.status) + 1:
+        forward = STATUS_FLOW.index(new) == STATUS_FLOW.index(event.status) + 1
+        if not forward and (event.status, new) not in ALLOWED_BACK_STEPS:
             raise ValidationError({'status': f'Cannot go from {event.status} to {new}.'})
         if new == 'live' and not event.competesin_set.exists():
             raise ValidationError({'status': 'Add at least one athlete before starting the event.'})
         event.status = new
-        event.save(update_fields=['status'])
+        event.auto_status = False                          # a manual change overrides the clock for this event
+        event.save(update_fields=['status', 'auto_status'])
         return Response(EventSerializer(event).data)
 
     @extend_schema(request=None, responses=ResultSerializer(many=True))
@@ -155,7 +168,7 @@ class EventViewSet(viewsets.ModelViewSet):
         if event.status == 'start_list':
             return Response({'detail': 'Start the event before ranking it.'}, status=status.HTTP_409_CONFLICT)
         run_auto_medals(event)
-        qs = event.competesin_set.select_related('athlete').order_by(*RESULT_ORDER)
+        qs = event.competesin_set.select_related('athlete', 'event__sport').order_by(*RESULT_ORDER)
         return Response(ResultSerializer(qs, many=True, context={'request': request}).data)
 
 
@@ -180,12 +193,14 @@ def run_auto_medals(event):
 class ResultUpdateView(UpdateAPIView):
     """PATCH /api/results/<id>/ - score, point, rank. Medal = admin only.
     A judge may only edit results of their own event, and only while it is live."""
-    queryset = CompetesIn.objects.select_related('athlete', 'event')
+    queryset = CompetesIn.objects.select_related('athlete', 'event__sport')
     serializer_class = ResultSerializer
     permission_classes = [IsAdminOrJudge]
     http_method_names = ['patch', 'options']
 
     def perform_update(self, serializer):
+        sync_event_statuses()
+        serializer.instance.event.refresh_from_db()
         event = serializer.instance.event
         user = self.request.user
         if user.role == 'judge':

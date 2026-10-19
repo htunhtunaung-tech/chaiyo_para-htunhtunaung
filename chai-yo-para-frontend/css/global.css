@@ -116,11 +116,8 @@ body { background-image: url('../images/bg-light.webp'); background-size: cover;
 @keyframes ken-burns { from { transform: scale(1); } to { transform: scale(1.08) translateX(-1%); } }
 @keyframes light-sweep { 0%, 20% { background-position: 120% 0; } 70%, 100% { background-position: -40% 0; } }
 
-/* High contrast: the pictures stay, but text sits on solid black (no see-through overlay). */
-:root[data-contrast='high'] .hero-photo .photo-layer { background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 40%, #000 52%, #000 100%), url('../images/hero-stadium.webp') left center / cover no-repeat; }
+:root[data-contrast='high'] .photo-banner .photo-layer, :root[data-contrast='high'] .hero-photo .photo-layer { background: var(--hero) !important; }
 :root[data-contrast='high'] .hero-photo .photo-layer::after { display: none; }
-:root[data-contrast='high'] .photo-banner .photo-layer::after { background: linear-gradient(90deg, #000 0%, #000 50%, rgba(0,0,0,.2) 75%, rgba(0,0,0,0) 100%); }
-:root[data-contrast='high'] .photo-banner > .row { background: #000; padding: 8px 12px; border-radius: 12px; }
 @media (max-width: 900px) {
   .hero-photo { grid-template-columns: 1fr; }
   .hero-photo .hero-copy { grid-column: 1; }

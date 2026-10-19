@@ -98,22 +98,6 @@ medal table moves.
 - Reuse the shared classes: `card`, `btn btn-primary`, `chip`, `badge badge-ok`, `input`,
   `table-head` and `table-row`. Colours are the variables in `css/tokens.css`.
 
-## Running with the Chai-Yo backend (Members 1 and 2)
-
-1. Start Django: `python manage.py runserver` (see the backend README; run `seed_competitions` once for demo data).
-2. Right-click `index.html` → **Open with Live Server**. `USE_MOCK` is `false`, so the pages read the real API.
-3. Sign in with `admin1` / `test1234` (or `judge1`, `sporter1`).
-
-How the backend's data is shown:
-- An event's sport group (`sport_name`: Track, Field, Road, Combined) gives its colour and filter; the discipline
-  (`sport_sub_type`) is shown as the sport. The sport class (T54, F46…) is read from the event name.
-- The backend has no venue field, so each group gets its usual venue (Track → Main track, Field → Throws and jumps area,
-  Road → Road course). The Sport class and Venue boxes in Event setup only appear with demo data.
-- The Judge box in Event setup takes the judge's user ID (a number), because that is what the backend stores.
-- Results: a time typed as `4:12.50` is saved as seconds (`252.50`), because the score column is a number.
-  Only admins send medals; judges can enter results only for their own events while they are live.
-- The backend only moves an event forward (start list → live → result), so "Reopen" only appears with demo data.
-
 ## Sign in, roles and staff access (Member 4)
 
 - `login.html` has Sign in and Register. `js/auth.js` does the work: `POST /api/auth/login/` returns
@@ -122,7 +106,7 @@ How the backend's data is shown:
 - Roles come from the backend: `admin`, `judge`, `sporter`. Visitors are people who are not signed in.
 - Staff pages need a sign-in. Admin opens everything. Judge opens Dashboard, Team, Delegations,
   Timetable, Results entry and Medals. Event setup, Venues, Announcements and Admin are admin only.
-  Sporters and visitors are sent away. Judges do not see admin-only links in the sidebar, and event links open Results entry for them. (`canOpen()` in `js/manage-ui.js` is the one place to change this.)
+  Sporters and visitors are sent away. (`canOpen()` in `js/manage-ui.js` is the one place to change this.)
 - The backend is the real gatekeeper: even if someone opens a page, Django still refuses writes without
   the right token and role.
 - Backend words are converted in two places only: `js/api.js` (what we send: Men/Women/Mixed, `start_list`,
@@ -155,7 +139,7 @@ All pictures are in `images/` (WebP, about 330 KB in total):
 | `athlete-wheelchair.webp` | Banner on the Athletes page |
 
 They are decorative, so screen readers skip them. Each sits under a dark overlay so white text keeps
-its contrast. In high contrast mode the pictures stay, but text sits on solid black and the page background picture is removed. Reduce motion stops their slow zoom.
+its contrast. High contrast mode removes every picture, and Reduce motion stops their slow zoom.
 
 ## Animation
 
